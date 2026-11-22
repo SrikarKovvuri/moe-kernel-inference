@@ -1,0 +1,11 @@
+# Validated development stack: Python 3.12.3, Linux/WSL2, CUDA driver 621.14.
+# Install torch from the CUDA index first:
+# python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cu128
+torch==2.9.0
+triton==3.5.0
+numpy==2.5.5
+pytest==9.2.0
+matplotlib==3.11.2
+ruff==0.17.6
+transformers==4.46.3
+accelerate==1.1.1
