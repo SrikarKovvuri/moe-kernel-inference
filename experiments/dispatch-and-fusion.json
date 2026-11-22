@@ -1,0 +1,11 @@
+[
+  {"name": "selective_default", "strategy": "hybrid", "threshold": 1},
+  {"name": "grouped_scan", "strategy": "grouped", "threshold": 0,
+   "kernel_config": {"packing": "triton_scan"}},
+  {"name": "selective_scan", "strategy": "hybrid", "threshold": 1,
+   "kernel_config": {"packing": "triton_scan"}},
+  {"name": "grouped_wide", "strategy": "grouped", "threshold": 0,
+   "kernel_config": {"combine_n": 64, "combine_k": 256}},
+  {"name": "selective_wide", "strategy": "hybrid", "threshold": 1,
+   "kernel_config": {"combine_n": 64, "combine_k": 256}}
+]

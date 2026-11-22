@@ -114,6 +114,22 @@ See [kernel design](docs/kernel-design.md) for tensor layout, numerical boundari
 single-writer aggregation, scheduling costs, and the distinction between avoided
 traffic and reduced allocation.
 
+Independent full-block controls randomize cases/candidate order, use fresh seeds,
+and bracket each case with the original grouped baseline:
+
+```sh
+python -m phasemoe.ablation --variants experiments/dispatch-and-fusion.json \
+  --seeds 11 22 33 --tokens 1 8 32 --distributions uniform skewed \
+  --mode cuda_graph --output runs/ablation.json
+python scripts/profile_native_grouped.py --output runs/native-profile.json \
+  --trace runs/native-trace.json
+```
+
+The ablation JSON retains results after every variant. It distinguishes independent
+seed cases from repeated timing samples and records before/after baseline drift.
+The native profiler records actual CPU operator and CUDA kernel counts; profile
+durations are not substituted for warmed benchmark measurements.
+
 [scripts/run_midpoint.sh](scripts/run_midpoint.sh) reproduces the main suite;
 [scripts/midpoint.slurm](scripts/midpoint.slurm) is a template that must be adapted
 to the actual cluster partition/account and environment. No cluster job has been submitted.
