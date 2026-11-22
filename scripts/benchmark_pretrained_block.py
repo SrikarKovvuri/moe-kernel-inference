@@ -40,6 +40,7 @@ def main():
     )
     p.add_argument("--mode", choices=["eager", "cuda_graph"], default="cuda_graph")
     p.add_argument("--device", default="cuda")
+    p.add_argument("--max-tokens", type=int, default=512)
     p.add_argument(
         "--backends",
         nargs="+",
@@ -50,7 +51,7 @@ def main():
     p.add_argument("--repetitions", type=int, default=100)
     p.add_argument("--download-only", action="store_true")
     args = p.parse_args()
-    if min(args.tokens) < 0 or args.warmup < 0 or args.repetitions < 1:
+    if min(args.tokens) < 0 or args.warmup < 0 or args.repetitions < 1 or args.max_tokens < 1:
         p.error("tokens/warmup must be nonnegative; repetitions positive")
     if args.mode == "cuda_graph" and any(not b.startswith("triton_") for b in args.backends):
         p.error("graph mode requires Triton backends")
@@ -111,9 +112,12 @@ def main():
         prefix_manifest=prefix_manifest,
         expert_manifest=expert_manifest,
         probes_sha256=hashlib.sha256(args.probes.read_bytes()).hexdigest(),
+        token_selection=args.tokens,
+        max_context_tokens=args.max_tokens,
+        order_seed=2026,
         results=[],
         limitations=(
-            "Three authored probes, layer 0, prefill or prefill-state subsets; "
+            "Limited supplied text probes, layer 0, prefill or prefill-state subsets; "
             "no generation/quality test."
         ),
     )
@@ -122,7 +126,9 @@ def main():
     try:
         with torch.inference_mode():
             for probe in json.loads(args.probes.read_text()):
-                ids = tokenizer(probe["text"], return_tensors="pt").input_ids.to(device)
+                ids = tokenizer(
+                    probe["text"], return_tensors="pt", truncation=True, max_length=args.max_tokens
+                ).input_ids.to(device)
                 all_hidden = prefix.hidden_states(ids)
                 for requested in args.tokens:
                     if requested > all_hidden.shape[0]:
@@ -159,6 +165,9 @@ def main():
                             prompt=probe["name"],
                             prompt_sha256=hashlib.sha256(probe["text"].encode()).hexdigest(),
                             prompt_source=probe.get("source", "authored repository text probe"),
+                            source_metadata={
+                                k: v for k, v in probe.items() if k.startswith("source_")
+                            },
                             context_tokens=ids.numel(),
                             tokens=x.shape[0],
                             token_positions=[all_hidden.shape[0] - x.shape[0], all_hidden.shape[0]],
