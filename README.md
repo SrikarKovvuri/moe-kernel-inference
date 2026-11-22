@@ -39,6 +39,19 @@ GPU dependencies are optional; CPU correctness and occupancy analysis remain use
 The research target is Linux/CUDA on L40S or A6000. Laptop GPU results, if collected,
 are development evidence and do not establish target-cluster performance.
 
+## Reproducible benchmark
+
+```sh
+python -m phasemoe.benchmark --preset tiny --device cpu --tokens 1 8 32 \
+  --distributions uniform balanced skewed --warmup 20 --repetitions 100 \
+  --output runs/cpu-smoke.json
+```
+
+Each JSON artifact records raw timings, correctness errors/tolerances, hardware,
+software, model shape, routing seed/distribution, warmup/repetitions, timing scope,
+and Git revision. CPU results validate the pipeline; they do not measure GPU fusion.
+Failed runs retain completed cases and an explicit failure status.
+
 ## Team
 
 Aedin Pereira, Srikar Kovvuri, David Samtani. UNIs and confirmed role assignments
