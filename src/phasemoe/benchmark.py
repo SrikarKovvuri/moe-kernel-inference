@@ -1,12 +1,14 @@
 """Benchmark protocol: raw measurements, provenance, and explicit timing scope."""
 
 import argparse
+import hashlib
 import importlib.metadata
 import json
 import math
 import platform
 import statistics
 import subprocess
+import sys
 import time
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -31,16 +33,41 @@ def _command(args):
 
 def environment(device):
     device = torch.device(device)
+    status = _command(["git", "status", "--porcelain"])
+    source_dir = Path(__file__).resolve().parent
+    source_hashes = {
+        f"phasemoe/{path.name}": hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(source_dir.glob("*.py"))
+    }
+    entrypoint = Path(sys.argv[0])
+    if entrypoint.is_file():
+        source_hashes[f"entrypoint/{entrypoint.name}"] = hashlib.sha256(
+            entrypoint.read_bytes()
+        ).hexdigest()
+    cpu_model = platform.processor()
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.exists():
+        cpu_model = next(
+            (
+                line.split(":", 1)[1].strip()
+                for line in cpuinfo.read_text().splitlines()
+                if line.startswith("model name")
+            ),
+            cpu_model,
+        )
     result = {
         "python": platform.python_version(),
         "platform": platform.platform(),
         "processor": platform.processor(),
+        "cpu_model": cpu_model,
         "torch": torch.__version__,
         "cuda_runtime": torch.version.cuda,
         "device": str(device),
         "cpu_threads": torch.get_num_threads(),
         "git_commit": _command(["git", "rev-parse", "HEAD"]),
-        "git_dirty": bool(_command(["git", "status", "--porcelain"])),
+        "git_dirty": bool(status),
+        "git_status": status,
+        "source_sha256": source_hashes,
         "matmul_fp32_precision": (
             torch.backends.cuda.matmul.fp32_precision
             if hasattr(torch.backends.cuda.matmul, "fp32_precision")

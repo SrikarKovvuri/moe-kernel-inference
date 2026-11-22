@@ -62,6 +62,8 @@ Each JSON artifact records raw timings, correctness errors/tolerances, hardware,
 software, model shape, routing seed/distribution, warmup/repetitions, timing scope,
 and Git revision. CPU results validate the pipeline; they do not measure GPU fusion.
 Failed runs retain completed cases and an explicit failure status.
+New runs also retain source-file SHA256 hashes, exact CPU model when available,
+and dirty-file status so report edits do not obscure the executed implementation.
 
 For the validated Linux/CUDA stack:
 
