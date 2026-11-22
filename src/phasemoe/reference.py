@@ -108,8 +108,10 @@ def error_metrics(actual, expected, *, atol, rtol):
         "rtol": rtol,
         "max_abs_error": float(error.max()) if error.numel() else 0.0,
         "rmse": float(error.square().mean().sqrt()) if error.numel() else 0.0,
-        "relative_l2_error": float(torch.linalg.vector_norm(a - b)
-                                   / torch.linalg.vector_norm(b).clamp_min(1e-12)),
+        "relative_l2_error": float(
+            torch.linalg.vector_norm(a - b) / torch.linalg.vector_norm(b).clamp_min(1e-12)
+        ),
         "fraction_outside_tolerance": float((error > allowed).float().mean())
-        if error.numel() else 0.0,
+        if error.numel()
+        else 0.0,
     }

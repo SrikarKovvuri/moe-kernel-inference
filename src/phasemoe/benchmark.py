@@ -10,6 +10,7 @@ import subprocess
 import time
 from dataclasses import asdict
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 import torch
@@ -21,7 +22,9 @@ from .routing import occupancy, synthetic_routing
 
 def _command(args):
     try:
-        return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=10).strip()
+        return subprocess.check_output(
+            args, text=True, stderr=subprocess.DEVNULL, timeout=10
+        ).strip()
     except (OSError, subprocess.SubprocessError):
         return None
 
@@ -29,9 +32,12 @@ def _command(args):
 def environment(device):
     device = torch.device(device)
     result = {
-        "python": platform.python_version(), "platform": platform.platform(),
-        "processor": platform.processor(), "torch": torch.__version__,
-        "cuda_runtime": torch.version.cuda, "device": str(device),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "torch": torch.__version__,
+        "cuda_runtime": torch.version.cuda,
+        "device": str(device),
         "cpu_threads": torch.get_num_threads(),
         "git_commit": _command(["git", "rev-parse", "HEAD"]),
         "git_dirty": bool(_command(["git", "status", "--porcelain"])),
@@ -45,11 +51,19 @@ def environment(device):
             result[package] = None
     if device.type == "cuda":
         props = torch.cuda.get_device_properties(device)
-        result.update(gpu_name=props.name, gpu_memory_bytes=props.total_memory,
-                      compute_capability=list(torch.cuda.get_device_capability(device)),
-                      multiprocessors=props.multi_processor_count,
-                      nvidia_smi=_command(["nvidia-smi", "--query-gpu=name,driver_version,power.limit",
-                                           "--format=csv,noheader"]))
+        result.update(
+            gpu_name=props.name,
+            gpu_memory_bytes=props.total_memory,
+            compute_capability=list(torch.cuda.get_device_capability(device)),
+            multiprocessors=props.multi_processor_count,
+            nvidia_smi=_command(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=name,driver_version,power.limit",
+                    "--format=csv,noheader",
+                ]
+            ),
+        )
     return result
 
 
@@ -63,9 +77,15 @@ def summarize(samples):
         lo, hi = math.floor(pos), math.ceil(pos)
         return ordered[lo] + (ordered[hi] - ordered[lo]) * (pos - lo)
 
-    return {"median_ms": statistics.median(samples), "mean_ms": statistics.mean(samples),
-            "p10_ms": quantile(0.1), "p90_ms": quantile(0.9),
-            "min_ms": min(samples), "max_ms": max(samples), "samples_ms": samples}
+    return {
+        "median_ms": statistics.median(samples),
+        "mean_ms": statistics.mean(samples),
+        "p10_ms": quantile(0.1),
+        "p90_ms": quantile(0.9),
+        "min_ms": min(samples),
+        "max_ms": max(samples),
+        "samples_ms": samples,
+    }
 
 
 @torch.inference_mode()
@@ -101,8 +121,13 @@ def measure(fn, *, device, warmup=20, repetitions=100):
         host.append((time.perf_counter_ns() - begin) / 1e6)
         if use_cuda:
             gpu.append(start.elapsed_time(end))
-    result = {"wall": summarize(host), "warmup": warmup, "repetitions": repetitions,
-              "mode": "eager", "wall_method": "perf_counter_ns; CUDA synchronized if applicable"}
+    result = {
+        "wall": summarize(host),
+        "warmup": warmup,
+        "repetitions": repetitions,
+        "mode": "eager",
+        "wall_method": "perf_counter_ns; CUDA synchronized if applicable",
+    }
     if gpu:
         result["cuda_event"] = summarize(gpu)
     return result
@@ -117,19 +142,28 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def run_case(config, *, tokens, distribution, dtype, device, seed, backend, threshold,
-             warmup, repetitions):
+def run_case(
+    config, *, tokens, distribution, dtype, device, seed, backend, threshold, warmup, repetitions
+):
     routing = synthetic_routing(config, tokens, distribution, seed).to(device)
     weights = ExpertWeights.random(config, seed=seed + 1, dtype=dtype, device=device)
-    x = torch.randn(tokens, config.hidden_size,
-                    generator=torch.Generator().manual_seed(seed + 2)).to(device=device, dtype=dtype)
+    x = torch.randn(
+        tokens, config.hidden_size, generator=torch.Generator().manual_seed(seed + 2)
+    ).to(device=device, dtype=dtype)
     validate_inputs(x, weights, routing)
     if backend == "torch":
-        fn = lambda: moe_torch(x, weights, routing)
+        fn = partial(moe_torch, x, weights, routing)
     else:
         from .triton_backend import moe_triton
-        fn = lambda: moe_triton(x, weights, routing, threshold=threshold,
-                               strategy=backend.removeprefix("triton_"))
+
+        fn = partial(
+            moe_triton,
+            x,
+            weights,
+            routing,
+            threshold=threshold,
+            strategy=backend.removeprefix("triton_"),
+        )
     actual = fn()
     # FP32 expert baseline scales to full dimensions; independent token oracle is
     # additionally exercised on the tiny preset and in the unit tests.
@@ -149,13 +183,29 @@ def run_case(config, *, tokens, distribution, dtype, device, seed, backend, thre
         torch.cuda.reset_peak_memory_stats(device)
     timings = measure(fn, device=device, warmup=warmup, repetitions=repetitions)
     result = {
-        "config": asdict(config), "tokens": tokens,
-        "batch_size": tokens, "context_size": 1, "workload_interpretation": "flattened tokens",
-        "distribution": distribution, "seed": seed, "dtype": str(dtype),
-        "backend": backend, "threshold": threshold, "weight_source": "synthetic random",
-        "routing_source": "synthetic", "scope": "expert_block_including_dispatch",
-        "excluded": ["router_linear", "softmax_topk", "attention", "normalization", "model_loading"],
-        "occupancy": occupancy(routing, threshold), "correctness": correctness, "timing": timings,
+        "config": asdict(config),
+        "tokens": tokens,
+        "batch_size": tokens,
+        "context_size": 1,
+        "workload_interpretation": "flattened tokens",
+        "distribution": distribution,
+        "seed": seed,
+        "dtype": str(dtype),
+        "backend": backend,
+        "threshold": threshold,
+        "weight_source": "synthetic random",
+        "routing_source": "synthetic",
+        "scope": "expert_block_including_dispatch",
+        "excluded": [
+            "router_linear",
+            "softmax_topk",
+            "attention",
+            "normalization",
+            "model_loading",
+        ],
+        "occupancy": occupancy(routing, threshold),
+        "correctness": correctness,
+        "timing": timings,
         "weight_bytes": config.weight_bytes(torch.empty((), dtype=dtype).element_size()),
     }
     if torch.device(device).type == "cuda":
@@ -167,11 +217,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preset", choices=["tiny", "olmoe"], default="tiny")
     parser.add_argument("--tokens", nargs="+", type=int, default=[1, 8, 32])
-    parser.add_argument("--distributions", nargs="+", choices=["uniform", "balanced", "skewed"],
-                        default=["uniform"])
-    parser.add_argument("--backends", nargs="+",
-                        choices=["torch", "triton_grouped", "triton_hybrid", "triton_fused"],
-                        default=["torch"])
+    parser.add_argument(
+        "--distributions", nargs="+", choices=["uniform", "balanced", "skewed"], default=["uniform"]
+    )
+    parser.add_argument(
+        "--backends",
+        nargs="+",
+        choices=["torch", "triton_grouped", "triton_hybrid", "triton_fused"],
+        default=["torch"],
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dtype", choices=["float32", "bfloat16", "float16"], default="float32")
     parser.add_argument("--threshold", type=int, default=1)
@@ -189,23 +243,38 @@ def main(argv=None):
         parser.error("CUDA requested but unavailable; use --device cpu for logic validation")
     torch.set_num_threads(args.threads)
     config = MoEConfig.tiny() if args.preset == "tiny" else MoEConfig()
-    report = {"schema_version": 1, "created_at_utc": datetime.now(timezone.utc).isoformat(),
-              "environment": environment(args.device), "arguments": vars(args) | {"output": str(args.output)},
-              "results": [], "status": "running"}
+    report = {
+        "schema_version": 1,
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "environment": environment(args.device),
+        "arguments": vars(args) | {"output": str(args.output)},
+        "results": [],
+        "status": "running",
+    }
     write_json(args.output, report)
     try:
         for distribution in args.distributions:
             for tokens in args.tokens:
                 for backend in args.backends:
-                    result = run_case(config, tokens=tokens, distribution=distribution,
-                                      dtype=getattr(torch, args.dtype), device=args.device,
-                                      seed=args.seed, backend=backend, threshold=args.threshold,
-                                      warmup=args.warmup, repetitions=args.repetitions)
+                    result = run_case(
+                        config,
+                        tokens=tokens,
+                        distribution=distribution,
+                        dtype=getattr(torch, args.dtype),
+                        device=args.device,
+                        seed=args.seed,
+                        backend=backend,
+                        threshold=args.threshold,
+                        warmup=args.warmup,
+                        repetitions=args.repetitions,
+                    )
                     report["results"].append(result)
                     write_json(args.output, report)
-                    print(f"{backend} tokens={tokens} {distribution}: "
-                          f"{result['timing']['wall']['median_ms']:.4f} ms wall; correctness passed",
-                          flush=True)
+                    print(
+                        f"{backend} tokens={tokens} {distribution}: "
+                        f"{result['timing']['wall']['median_ms']:.4f} ms wall; correctness passed",
+                        flush=True,
+                    )
     except Exception as exc:
         report.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         write_json(args.output, report)

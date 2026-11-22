@@ -18,7 +18,7 @@ def test_packing_is_a_bijection_and_conserves_assignments(distribution, tokens):
     assert torch.equal(p.counts, torch.bincount(r.expert_ids.flatten(), minlength=c.num_experts))
     packed_ids = r.expert_ids.flatten()[p.assignment_ids]
     for e in range(c.num_experts):
-        assert (packed_ids[p.offsets[e]:p.offsets[e + 1]] == e).all()
+        assert (packed_ids[p.offsets[e] : p.offsets[e + 1]] == e).all()
     stats = occupancy(r)
     assert sum(stats["histogram"]) == c.num_experts
     assert stats["assignments"] == tokens * c.top_k
@@ -41,19 +41,26 @@ def test_expert_baseline_matches_independent_oracle(distribution, tokens, normal
 
 def test_weighted_slots_and_expert_orientation_by_hand():
     x = torch.tensor([[2.0]])
-    w = ExpertWeights(torch.tensor([[[1.0]], [[2.0]]]),
-                      torch.tensor([[[3.0]], [[4.0]]]),
-                      torch.tensor([[[5.0]], [[6.0]]]))
+    w = ExpertWeights(
+        torch.tensor([[[1.0]], [[2.0]]]),
+        torch.tensor([[[3.0]], [[4.0]]]),
+        torch.tensor([[[5.0]], [[6.0]]]),
+    )
     r = Routing(torch.tensor([[1, 0]]), torch.tensor([[0.2, 0.1]]), 2)
     expected = 0.2 * torch.nn.functional.silu(torch.tensor(4.0)) * 8 * 6
     expected += 0.1 * torch.nn.functional.silu(torch.tensor(2.0)) * 6 * 5
     torch.testing.assert_close(moe_torch(x, w, r).squeeze(), expected)
 
 
-@pytest.mark.parametrize("ids,weights", [([[0, 0]], [[0.2, 0.3]]),
-                                         ([[0, 2]], [[0.2, 0.3]]),
-                                         ([[0, 1]], [[-0.1, 0.3]]),
-                                         ([[0, 1]], [[float("nan"), 0.3]])])
+@pytest.mark.parametrize(
+    "ids,weights",
+    [
+        ([[0, 0]], [[0.2, 0.3]]),
+        ([[0, 2]], [[0.2, 0.3]]),
+        ([[0, 1]], [[-0.1, 0.3]]),
+        ([[0, 1]], [[float("nan"), 0.3]]),
+    ],
+)
 def test_invalid_routes_rejected(ids, weights):
     with pytest.raises(ValueError):
         Routing(torch.tensor(ids), torch.tensor(weights), 2).validate()
