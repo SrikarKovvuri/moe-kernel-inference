@@ -25,6 +25,41 @@ The sweep tested 216 correct candidates: thresholds 0/1/2/4, combine columns 16/
 
 Threshold zero wins some cases. Small selected differences do not justify adopting a new default; the skewed one-token case also showed about 4% baseline drift. [Raw sweep](results/tuning-down-combine.json)
 
+## Independent full-block controls: graph
+
+18 cases use fresh seeds 11/22/33, T=1/8/32, uniform/skewed routes, randomized case and candidate order, and default grouped controls before and after each case. Each variant has 20 warmups and 100 samples. Maximum absolute baseline drift was 0.15%. Ratios use matching seeds; the default control is the mean of its before/after medians. Bars below are ranges over three seed cases, not confidence intervals. Repeated invocations are not treated as independent trials.
+
+| Comparison | Routes | T | Median ratio | Seed range |
+| --- | --- | --- | --- | --- |
+| Fusion, default dispatch | skewed | 1 | 0.9984 | 0.9980–0.9988 |
+| Fusion, default dispatch | uniform | 1 | 0.9986 | 0.9983–0.9986 |
+| Fusion, default dispatch | skewed | 8 | 0.9987 | 0.9975–0.9988 |
+| Fusion, default dispatch | uniform | 8 | 1.0012 | 1.0002–1.0026 |
+| Fusion, default dispatch | skewed | 32 | 0.9993 | 0.9992–0.9997 |
+| Fusion, default dispatch | uniform | 32 | 1.0001 | 0.9990–1.0001 |
+| Dispatch only, grouped | skewed | 1 | 1.0170 | 1.0161–1.0172 |
+| Dispatch only, grouped | uniform | 1 | 1.0175 | 1.0173–1.0177 |
+| Dispatch only, grouped | skewed | 8 | 1.0082 | 1.0080–1.0092 |
+| Dispatch only, grouped | uniform | 8 | 1.0036 | 1.0034–1.0040 |
+| Dispatch only, grouped | skewed | 32 | 1.0108 | 1.0107–1.0110 |
+| Dispatch only, grouped | uniform | 32 | 1.0045 | 1.0037–1.0045 |
+| Fusion with scan dispatch | skewed | 1 | 0.9982 | 0.9979–1.0002 |
+| Fusion with scan dispatch | uniform | 1 | 0.9983 | 0.9975–0.9989 |
+| Fusion with scan dispatch | skewed | 8 | 0.9988 | 0.9966–0.9989 |
+| Fusion with scan dispatch | uniform | 8 | 1.0011 | 1.0005–1.0024 |
+| Fusion with scan dispatch | skewed | 32 | 0.9993 | 0.9990–0.9997 |
+| Fusion with scan dispatch | uniform | 32 | 1.0000 | 0.9998–1.0003 |
+| Fusion with wide combine tile | skewed | 1 | 1.0005 | 0.9985–1.0012 |
+| Fusion with wide combine tile | uniform | 1 | 1.0003 | 0.9998–1.0005 |
+| Fusion with wide combine tile | skewed | 8 | 1.0004 | 0.9993–1.0007 |
+| Fusion with wide combine tile | uniform | 8 | 1.0036 | 1.0034–1.0040 |
+| Fusion with wide combine tile | skewed | 32 | 0.9993 | 0.9990–0.9997 |
+| Fusion with wide combine tile | uniform | 32 | 0.9999 | 0.9998–1.0002 |
+
+![Matched full-block comparisons](figures/ablation-graph.png)
+
+[Raw controls](results/ablation-graph.json)
+
 ## Native PyTorch grouped-mm execution
 
 The T=8 uniform BF16 profile contains 3 native grouped-mm calls, 192 individual matrix-multiply operator calls, and device-to-host offset copies. This is evidence of the host-loop fallback on this software/GPU, not execution of a fast single grouped kernel. The trace follows 20 warmups and records one invocation. Profiler durations are not used as benchmark latency. [Profile summary](results/native-profile.json) · [Trace](results/native-trace.json)

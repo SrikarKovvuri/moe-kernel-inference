@@ -144,7 +144,8 @@ def build(benchmark, profile, output):
                 f"Measured hardware: {env['gpu_name']}, {env['gpu_memory_bytes'] / 2**30:.2f} GiB "
                 f"reported device memory, compute capability 8.9 and 24 SMs. Software: Python "
                 f"{env['python']}, PyTorch {env['torch']}, Triton {env['triton']}, CUDA runtime "
-                f"{env['cuda_runtime']}, NVIDIA driver 621.14, Linux under WSL2. PyTorch uses one CPU thread.",
+                f"{env['cuda_runtime']}, NVIDIA driver 621.14, Linux under WSL2. "
+                "Host CPU: Intel Core Ultra 9 185H. PyTorch uses one CPU thread.",
                 "The GPU was observed in P8 during sustained load, at 210 MHz SM and 405 MHz memory "
                 "clocks, with a 15 W current power limit and software power/thermal caps reported. "
                 "This is a material limitation on performance interpretation; a diagnostic snapshot "
@@ -255,6 +256,87 @@ def build(benchmark, profile, output):
             ],
         ),
     ]
+    capture_path = output / "first-layer-routes/capture-manifest.json"
+    public_path = output / "wikitext-routes/capture-manifest.json"
+    route_rows = []
+    if capture_path.exists() and public_path.exists():
+        for source, path in (("Authored", capture_path), ("WikiText-2", public_path)):
+            capture = json.loads(path.read_text())
+            if capture["status"] != "complete":
+                raise ValueError("routing evidence must be complete")
+            for index, trace in enumerate(capture["traces"], 1):
+                route_rows.append(
+                    [
+                        f"{source} {index}",
+                        str(trace["provenance"]["context_tokens"]),
+                        str(trace["occupancy"]["singleton_experts"]),
+                        str(trace["occupancy"]["max_occupancy"]),
+                    ]
+                )
+        revised = []
+        for heading, paragraphs in blocks:
+            if heading == "Project summary":
+                paragraphs[-1] = (
+                    "The initial table uses OLMoE-1B-7B dimensions: 64 experts, top-8 routing, "
+                    "hidden width 2048 and intermediate width 1024, with random weights and "
+                    "synthetic routes. Follow-up experiments separately identify pretrained "
+                    "first-layer routing and checkpoint-backed numerical validation."
+                )
+            if heading == "Future work and scope adjustments":
+                followup = [
+                    "Follow-up experiments include 45 full-shape CUDA-graph cases and 216 isolated "
+                    "down/combine candidates (thresholds 0/1/2/4; combine N=16/32/64, K=64/128/256). "
+                    "The sweep uses 10 warmups per phase and 30 samples; full-block graph runs use "
+                    "20 warmups per phase and 100 replays. All use the same constrained GPU and BF16 "
+                    "dimensions. Isolated timings and graph replay are not mixed with the eager table.",
+                    "Independent full-block controls use seeds 11/22/33, T=1/8/32 and uniform/skewed "
+                    "routes, randomized order, and grouped controls before/after each case. The 126 "
+                    "graph measurements show fusion near parity. A separate two-kernel routing packer "
+                    "reduces one-token graph latency by about 1.7%; this is a dispatch result, not "
+                    "a fusion gain. Eager controls and raw samples are recorded separately.",
+                    "A small exact prefix captures pretrained layer-0 prefill routes using 228.77 MiB "
+                    "of embedding/attention/norm/router tensors. Six probes comprise three authored "
+                    "texts (87–93 tokens) and three pinned WikiText-2 test paragraphs (128 tokens). "
+                    "They have 1–6 singleton experts. This is a narrow first-layer diagnostic sample, "
+                    "not a generation run or corpus-wide evaluation.",
+                ]
+                pretrained_path = output / "results/pretrained-block.json"
+                if pretrained_path.exists():
+                    pretrained = json.loads(pretrained_path.read_text())
+                    if pretrained["status"] != "complete":
+                        raise ValueError("pretrained evidence must be complete")
+                    p_rows = pretrained["results"]
+                    error = max(r["correctness"]["relative_l2_error"] for r in p_rows)
+                    followup.append(
+                        f"All {len(p_rows)} checkpoint-backed BF16 GPU cases pass both FP32 and upstream "
+                        f"BF16 comparisons (atol 0.02, rtol 0.03); maximum relative L2 error versus "
+                        f"FP32 is {error:.5f}. They use actual first-layer expert weights and prefix "
+                        "hidden states, 20 warmups per graph phase and 100 replays. T=1/8 are prefill "
+                        "state subsets; full prompts have 87–93 tokens. Attention/router work is "
+                        "excluded. This is not end-to-end model latency or a quality evaluation."
+                    )
+                revised.append(("Follow-up validation", followup))
+                paragraphs = [
+                    "Rerun on an L40S or A6000 with stable power/clocks and a competitive external "
+                    "grouped-GEMM backend. The native PyTorch grouped-mm API was profiled here and "
+                    "uses a host-loop fallback (3 grouped calls expand to 192 matrix-multiply calls).",
+                    "Extend real-route collection to more prompts, later layers and actual decode. "
+                    "Collect Nsight memory counters and test model quality before any broader claim. "
+                    "The current scope remains one expert block; full-model and H100 evaluation are "
+                    "stretch goals. Existing defaults remain unchanged because fusion gains are unproven.",
+                ]
+            if heading == "Blockers and limitations":
+                paragraphs[1] = paragraphs[1].replace(
+                    "Cluster execution and pretrained routing collection remain unverified.",
+                    "Cluster execution, later-layer/decode tracing and model quality remain unverified.",
+                )
+            if heading == "Project links and references":
+                paragraphs.insert(
+                    2,
+                    f"Follow-up methods and evidence: {REPO}/blob/main/reports/followup-analysis.md",
+                )
+            revised.append((heading, paragraphs))
+        blocks = revised
     latency_rows = []
     for tokens in sorted({key[0] for key in uniform}):
         latency_rows.append(
@@ -355,7 +437,30 @@ def build(benchmark, profile, output):
             md.extend("| " + " | ".join(row) + " |" for row in profile_rows)
             md.append("")
     figure = output / "figures" / "uniform" / "occupancy.png"
-    if figure.exists():
+    if route_rows:
+        document.add_heading("Observed pretrained first-layer occupancy", level=2)
+        caption = (
+            "Intel Core Ultra 9 185H, CPU BF16, upstream eager causal attention, batch 1; "
+            "context length below. "
+            "Each row is one prefill capture, not a latency measurement. No warmup/repetitions "
+            "apply to these deterministic occupancy counts. Checkpoint and source hashes are archived."
+        )
+        document.add_paragraph(caption).paragraph_format.keep_with_next = True
+        headers = ["Probe", "Context tokens", "Singleton experts", "Maximum occupancy"]
+        add_table(document, headers, route_rows, [1.4, 1.2, 1.4, 1.5])
+        md.extend(
+            [
+                "## Observed pretrained first-layer occupancy",
+                "",
+                caption,
+                "",
+                "| " + " | ".join(headers) + " |",
+                "|" + " --- |" * len(headers),
+            ]
+        )
+        md.extend("| " + " | ".join(row) + " |" for row in route_rows)
+        md.extend(["", "Additional latency and occupancy plots are in [figures](figures).", ""])
+    elif figure.exists():
         document.add_heading("Observed synthetic occupancy", level=2)
         paragraph = document.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
