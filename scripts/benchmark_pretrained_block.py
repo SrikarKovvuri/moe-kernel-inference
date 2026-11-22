@@ -5,6 +5,7 @@ timing. Small token subsets are selected from prefill, not called decode workloa
 """
 
 import argparse
+import hashlib
 import json
 import random
 from dataclasses import asdict
@@ -109,6 +110,7 @@ def main():
         config=asdict(config_from_hf(module)),
         prefix_manifest=prefix_manifest,
         expert_manifest=expert_manifest,
+        probes_sha256=hashlib.sha256(args.probes.read_bytes()).hexdigest(),
         results=[],
         limitations=(
             "Three authored probes, layer 0, prefill or prefill-state subsets; "
@@ -155,6 +157,8 @@ def main():
                         hf_check = error_metrics(actual, hf_output, atol=0.02, rtol=0.03)
                         row = dict(
                             prompt=probe["name"],
+                            prompt_sha256=hashlib.sha256(probe["text"].encode()).hexdigest(),
+                            prompt_source=probe.get("source", "authored repository text probe"),
                             context_tokens=ids.numel(),
                             tokens=x.shape[0],
                             token_positions=[all_hidden.shape[0] - x.shape[0], all_hidden.shape[0]],

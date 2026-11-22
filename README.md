@@ -191,6 +191,20 @@ weights remain in a local safetensors cache and are not committed. The optional
 model integration is pinned to Transformers 4.46.3, whose numerical behavior is
 covered by the tests.
 
+For a small public-text diagnostic sample, the optional preparation script selects
+three long paragraphs from a pinned WikiText-2 test file. It records source URL,
+revision, line numbers, license attribution and checksum; raw text stays in `runs/`.
+
+```sh
+python scripts/prepare_wikitext_probes.py
+python scripts/capture_first_layer_routes.py --probes runs/wikitext-probes.json \
+  --max-tokens 128 --output runs/wikitext-routes
+```
+
+This is the tokenized WikiText test text, not its raw variant, and three selected
+paragraphs do not constitute a benchmark-wide evaluation. Dataset attribution:
+[WikiText dataset card](https://huggingface.co/datasets/Salesforce/wikitext).
+
 ## Team
 
 Aedin Pereira, Srikar Kovvuri, David Samtani. UNIs and confirmed role assignments

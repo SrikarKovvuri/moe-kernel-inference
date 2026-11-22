@@ -82,7 +82,10 @@ def main():
             prompt_name=probe["name"],
             prompt_sha256=hashlib.sha256(probe["text"].encode()).hexdigest(),
             token_ids_sha256=hashlib.sha256(tokens.cpu().numpy().tobytes()).hexdigest(),
-            prompt_source="authored repository text probe; not a representative corpus",
+            prompt_source=probe.get(
+                "source", "authored repository text probe; not a representative corpus"
+            ),
+            source_metadata={k: v for k, v in probe.items() if k.startswith("source_")},
             context_tokens=tokens.numel(),
             batch_size=1,
             max_tokens=args.max_tokens,
