@@ -241,6 +241,8 @@ Within this mode, grouped/selective ratios span 0.9607–0.9650. Do not mix thes
 
 These longer inputs join adjacent WikiText source lines into contiguous passages of at least 4000 characters, then tokenize/truncate to 512 tokens. Start/end source lines and hashes are retained. Singleton counts span 0–1 across these three prompts. A zero count means threshold-1 fusion has no light-expert work to optimize. This is a separate probe set from the 128-token paragraph comparison.
 
+The paired CUDA-event and synchronized wall medians differ by up to 9.28% in this run. The cause is unresolved; both clocks and raw samples are preserved. This additional measurement limitation requires validation on a stable host/device before interpreting small gains. The table above consistently uses CUDA-event medians.
+
 ## Matched router-inclusive upstream comparison
 
 All 27 cases passed both numerical checks. These eager measurements include router projection, FP32 softmax, top-k selection, route-weight casting, dispatch and expert computation for every backend, with 20 warmups and 100 samples. Attention and normalization are excluded. The same pretrained authored probes and T=1/8/full prefill-state selections are used.

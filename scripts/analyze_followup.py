@@ -357,13 +357,21 @@ def main():
         ]
         if filename == "pretrained-wikitext-long-graph.json":
             singleton_counts = [r["occupancy"]["singleton_experts"] for r in rows]
+            clock_disagreement = max(
+                abs(ms(r) / r["timing"]["wall"]["median_ms"] - 1) for r in rows
+            )
             text += [
                 "These longer inputs join adjacent WikiText source lines into contiguous "
                 "passages of at least 4000 characters, then tokenize/truncate to 512 tokens. "
                 "Start/end source lines and hashes are retained. Singleton counts span "
                 f"{min(singleton_counts)}–{max(singleton_counts)} across these three prompts. "
                 "A zero count means threshold-1 fusion has no light-expert work to optimize. "
-                "This is a separate probe set from the 128-token paragraph comparison."
+                "This is a separate probe set from the 128-token paragraph comparison.",
+                "The paired CUDA-event and synchronized wall medians differ by up to "
+                f"{100 * clock_disagreement:.2f}% in this run. The cause is unresolved; both "
+                "clocks and raw samples are preserved. This additional measurement limitation "
+                "requires validation on a stable host/device before interpreting small gains. "
+                "The table above consistently uses CUDA-event medians."
             ]
     whole_path = root / "results/pretrained-whole-moe.json"
     if whole_path.exists():
