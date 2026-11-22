@@ -25,6 +25,7 @@ baseline, with no consistent speedup. **The GPU was power/clock constrained in P
 do not establish L40S/A6000 performance. See the [midpoint draft](reports/midpoint-report.md),
 [editable report](reports/midpoint-report.docx), [raw evidence](reports/results), and
 [figures](reports/figures).
+The [PDF report](reports/midpoint-report.pdf) is also available for review.
 
 The [follow-up analysis](reports/followup-analysis.md) separates graph timing,
 threshold/tile tuning, native backend profiling, and pretrained first-layer routes.
@@ -138,6 +139,8 @@ durations are not substituted for warmed benchmark measurements.
 [scripts/run_midpoint.sh](scripts/run_midpoint.sh) reproduces the main suite;
 [scripts/midpoint.slurm](scripts/midpoint.slurm) is a template that must be adapted
 to the actual cluster partition/account and environment. No cluster job has been submitted.
+The [cluster rerun guide](docs/cluster-runbook.md) covers environment setup, matched
+controls, pretrained data and the interpretation of results.
 
 ## Pretrained routing traces
 

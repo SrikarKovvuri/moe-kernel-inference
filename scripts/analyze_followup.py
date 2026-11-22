@@ -305,6 +305,90 @@ def main():
             "report archiving. A [source audit](results/pretrained-block-provenance.md) verifies "
             "that the measured benchmark and kernel files match the recorded revision.",
         ]
+    supplements = [
+        ("Public-text checkpoint blocks, graph replay", "pretrained-wikitext-graph.json"),
+        ("Authored-probe checkpoint blocks, eager", "pretrained-eager.json"),
+        ("Public-text checkpoint blocks, eager", "pretrained-wikitext-eager.json"),
+    ]
+    for title, filename in supplements:
+        path = root / "results" / filename
+        if not path.exists():
+            continue
+        supplement = read(path)
+        rows = supplement["results"]
+        if any(
+            not r["correctness"]["passed"] or not r["upstream_bf16_comparison"]["passed"]
+            for r in rows
+        ):
+            raise ValueError("pretrained supplement has failed correctness")
+        grouped = {(r["prompt"], r["tokens"]): r for r in rows if r["backend"] == "triton_grouped"}
+        hybrid = {(r["prompt"], r["tokens"]): r for r in rows if r["backend"] == "triton_hybrid"}
+        fused = {(r["prompt"], r["tokens"]): r for r in rows if r["backend"] == "triton_fused"}
+        ratios = [ms(grouped[key]) / ms(hybrid[key]) for key in grouped]
+        timing = rows[0]["timing"]
+        max_error = max(r["correctness"]["relative_l2_error"] for r in rows)
+        text += [
+            f"## {title}",
+            f"All {len(rows)} cases passed the same two numerical comparisons. "
+            f"Maximum relative L2 error against FP32: {max_error:.5f}. Timing mode is "
+            f"{timing['mode']}, with {timing['warmup']} warmups and {timing['repetitions']} "
+            "measurements per variant (graph mode also records capture/replay warmups). "
+            "Hardware, BF16 dimensions and expert-block scope match the development setup. "
+            "T=1/8 remain prefill-state subsets, not decode. Inputs/weights are pretrained; "
+            "only backend order is randomized. These are narrow probe comparisons, not "
+            "independent timing trials or corpus-level quality evaluation.",
+            f"Within this mode, grouped/selective ratios span {min(ratios):.4f}–{max(ratios):.4f}. "
+            "Do not mix these numbers with the other timing mode or route-only replay.",
+            table(
+                ["Probe", "T", "Grouped ms", "Selective ms", "Uniform fused ms"],
+                [
+                    [
+                        key[0],
+                        key[1],
+                        f"{ms(grouped[key]):.4f}",
+                        f"{ms(hybrid[key]):.4f}",
+                        f"{ms(fused[key]):.4f}",
+                    ]
+                    for key in grouped
+                ],
+            ),
+            f"[Raw supplemental evidence](results/{filename})",
+        ]
+    whole_path = root / "results/pretrained-whole-moe.json"
+    if whole_path.exists():
+        whole = read(whole_path)
+        rows = whole["results"]
+        backends = {
+            backend: {(r["prompt"], r["tokens"]): r for r in rows if r["backend"] == backend}
+            for backend in ("hf", "triton_grouped", "triton_hybrid")
+        }
+        text += [
+            "## Matched router-inclusive upstream comparison",
+            f"All {len(rows)} cases passed both numerical checks. These eager measurements "
+            "include router projection, FP32 softmax, top-k selection, route-weight casting, "
+            "dispatch and expert computation for every backend, with 20 warmups and 100 "
+            "samples. Attention and normalization are excluded. The same pretrained authored "
+            "probes and T=1/8/full prefill-state selections are used.",
+            "The HF row executes the actual Transformers OLMoE module. Its Python expert "
+            "loop is a model reference, not a fast production grouped kernel. Compare selective "
+            "against Triton grouped to isolate fusion. Comparing against HF also includes the "
+            "shared grouped projection, activation and dispatch implementation changes. "
+            "These rows cannot be combined with expert-only timings.",
+            table(
+                ["Probe", "T", "HF module ms", "Triton grouped ms", "Selective ms"],
+                [
+                    [
+                        key[0],
+                        key[1],
+                        f"{ms(backends['hf'][key]):.4f}",
+                        f"{ms(backends['triton_grouped'][key]):.4f}",
+                        f"{ms(backends['triton_hybrid'][key]):.4f}",
+                    ]
+                    for key in backends["hf"]
+                ],
+            ),
+            "[Router-inclusive raw evidence](results/pretrained-whole-moe.json)",
+        ]
     text += [
         "## Interpretation",
         "The measured fusion hypothesis remains unproven. Keep the grouped baseline and existing "

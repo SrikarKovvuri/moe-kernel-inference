@@ -60,6 +60,41 @@ Threshold zero wins some cases. Small selected differences do not justify adopti
 
 [Raw controls](results/ablation-graph.json)
 
+## Independent full-block controls: eager
+
+18 cases use fresh seeds 11/22/33, T=1/8/32, uniform/skewed routes, randomized case and candidate order, and default grouped controls before and after each case. Each variant has 20 warmups and 100 samples. Maximum absolute baseline drift was 4.48%. Ratios use matching seeds; the default control is the mean of its before/after medians. Bars below are ranges over three seed cases, not confidence intervals. Repeated invocations are not treated as independent trials.
+
+| Comparison | Routes | T | Median ratio | Seed range |
+| --- | --- | --- | --- | --- |
+| Fusion, default dispatch | skewed | 1 | 1.0032 | 0.9902–1.0118 |
+| Fusion, default dispatch | uniform | 1 | 1.0062 | 0.9748–1.0203 |
+| Fusion, default dispatch | skewed | 8 | 0.9921 | 0.9903–1.0148 |
+| Fusion, default dispatch | uniform | 8 | 0.9967 | 0.9960–1.0113 |
+| Fusion, default dispatch | skewed | 32 | 1.0055 | 1.0001–1.0084 |
+| Fusion, default dispatch | uniform | 32 | 0.9992 | 0.9895–0.9996 |
+| Dispatch only, grouped | skewed | 1 | 1.0602 | 1.0435–1.0617 |
+| Dispatch only, grouped | uniform | 1 | 1.0814 | 1.0246–1.0840 |
+| Dispatch only, grouped | skewed | 8 | 1.0495 | 1.0406–1.0542 |
+| Dispatch only, grouped | uniform | 8 | 1.0275 | 1.0193–1.0282 |
+| Dispatch only, grouped | skewed | 32 | 1.0369 | 1.0273–1.0419 |
+| Dispatch only, grouped | uniform | 32 | 1.0143 | 1.0045–1.0149 |
+| Fusion with scan dispatch | skewed | 1 | 1.0118 | 1.0112–1.0144 |
+| Fusion with scan dispatch | uniform | 1 | 1.0178 | 1.0022–1.0190 |
+| Fusion with scan dispatch | skewed | 8 | 0.9965 | 0.9919–1.0198 |
+| Fusion with scan dispatch | uniform | 8 | 1.0009 | 1.0006–1.0013 |
+| Fusion with scan dispatch | skewed | 32 | 1.0000 | 0.9918–1.0035 |
+| Fusion with scan dispatch | uniform | 32 | 0.9994 | 0.9994–0.9998 |
+| Fusion with wide combine tile | skewed | 1 | 0.9705 | 0.9694–1.0088 |
+| Fusion with wide combine tile | uniform | 1 | 1.0101 | 0.9720–1.0329 |
+| Fusion with wide combine tile | skewed | 8 | 0.9995 | 0.9937–1.0012 |
+| Fusion with wide combine tile | uniform | 8 | 0.9948 | 0.9857–1.0032 |
+| Fusion with wide combine tile | skewed | 32 | 1.0061 | 1.0007–1.0236 |
+| Fusion with wide combine tile | uniform | 32 | 0.9953 | 0.9878–1.0014 |
+
+![Matched full-block comparisons](figures/ablation-eager.png)
+
+[Raw controls](results/ablation-eager.json)
+
 ## Native PyTorch grouped-mm execution
 
 The T=8 uniform BF16 profile contains 3 native grouped-mm calls, 192 individual matrix-multiply operator calls, and device-to-host offset copies. This is evidence of the host-loop fallback on this software/GPU, not execution of a fast single grouped kernel. The trace follows 20 warmups and records one invocation. Profiler durations are not used as benchmark latency. [Profile summary](results/native-profile.json) · [Trace](results/native-trace.json)

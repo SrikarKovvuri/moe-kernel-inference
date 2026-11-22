@@ -291,7 +291,7 @@ def build(benchmark, profile, output):
                     "dimensions. Isolated timings and graph replay are not mixed with the eager table.",
                     "Independent full-block controls use seeds 11/22/33, T=1/8/32 and uniform/skewed "
                     "routes, randomized order, and grouped controls before/after each case. The 126 "
-                    "graph measurements show fusion near parity. A separate two-kernel routing packer "
+                    "graph variant runs show fusion near parity. A separate two-kernel routing packer "
                     "reduces one-token graph latency by about 1.7%; this is a dispatch result, not "
                     "a fusion gain. Eager controls and raw samples are recorded separately.",
                     "A small exact prefix captures pretrained layer-0 prefill routes using 228.77 MiB "
@@ -393,7 +393,9 @@ def build(benchmark, profile, output):
         document.add_heading(heading, level=1)
         md.extend([f"## {heading}", ""])
         for paragraph in paragraphs:
-            add_prose(document, paragraph)
+            prose = add_prose(document, paragraph)
+            if paragraph.startswith("The PyTorch baseline launches"):
+                prose.paragraph_format.keep_together = True
             md.extend([paragraph, ""])
         if heading == "Profiling and baseline analysis":
             document.add_heading("Uniform routing latency snapshot", level=2)

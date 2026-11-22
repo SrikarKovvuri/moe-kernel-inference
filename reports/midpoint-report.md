@@ -12,11 +12,11 @@ PhaseMoE investigates whether expert occupancy can guide down-projection executi
 
 At this midpoint, we have a working PyTorch reference, grouped Triton baseline, selective and uniformly fused implementations, correctness tests, and reproducible single-block benchmarks. The initial measurements do not establish a consistent selective-fusion speedup. They are development evidence from a power-constrained laptop GPU, not results on the proposed L40S or A6000 cluster hardware.
 
-The workload uses OLMoE-1B-7B dimensions: 64 experts, top-8 routing, hidden width 2048 and intermediate width 1024. We use synthetic random weights and controlled uniform, balanced and skewed routing. No pretrained checkpoint or public-text routing trace was used for the reported measurements.
+The initial table uses OLMoE-1B-7B dimensions: 64 experts, top-8 routing, hidden width 2048 and intermediate width 1024, with random weights and synthetic routes. Follow-up experiments separately identify pretrained first-layer routing and checkpoint-backed numerical validation.
 
 ## Baseline and experimental setup
 
-Measured hardware: NVIDIA GeForce RTX 4060 Laptop GPU, 8.00 GiB reported device memory, compute capability 8.9 and 24 SMs. Software: Python 3.12.3, PyTorch 2.9.0+cu128, Triton 3.5.0, CUDA runtime 12.8, NVIDIA driver 621.14, Linux under WSL2. PyTorch uses one CPU thread.
+Measured hardware: NVIDIA GeForce RTX 4060 Laptop GPU, 8.00 GiB reported device memory, compute capability 8.9 and 24 SMs. Software: Python 3.12.3, PyTorch 2.9.0+cu128, Triton 3.5.0, CUDA runtime 12.8, NVIDIA driver 621.14, Linux under WSL2. Host CPU: Intel Core Ultra 9 185H. PyTorch uses one CPU thread.
 
 The GPU was observed in P8 during sustained load, at 210 MHz SM and 405 MHz memory clocks, with a 15 W current power limit and software power/thermal caps reported. This is a material limitation on performance interpretation; a diagnostic snapshot is archived with the results. Clocks were not locked and Nsight memory counters were not collected.
 
@@ -66,27 +66,35 @@ The selective kernel is implemented and GPU-tested. It gives each token/output t
 
 The prototype avoids projected-row traffic for light experts but still reserves the full projected-output buffer in hybrid mode. It does not demonstrate an allocation reduction. The direct reduction can lose weight reuse and Tensor Core efficiency. CUDA-graph timing, phase profiling, and a randomized threshold/tile search are available as separate experiments; their results must not be mixed with the eager latency table.
 
+## Follow-up validation
+
+Follow-up experiments include 45 full-shape CUDA-graph cases and 216 isolated down/combine candidates (thresholds 0/1/2/4; combine N=16/32/64, K=64/128/256). The sweep uses 10 warmups per phase and 30 samples; full-block graph runs use 20 warmups per phase and 100 replays. All use the same constrained GPU and BF16 dimensions. Isolated timings and graph replay are not mixed with the eager table.
+
+Independent full-block controls use seeds 11/22/33, T=1/8/32 and uniform/skewed routes, randomized order, and grouped controls before/after each case. The 126 graph variant runs show fusion near parity. A separate two-kernel routing packer reduces one-token graph latency by about 1.7%; this is a dispatch result, not a fusion gain. Eager controls and raw samples are recorded separately.
+
+A small exact prefix captures pretrained layer-0 prefill routes using 228.77 MiB of embedding/attention/norm/router tensors. Six probes comprise three authored texts (87–93 tokens) and three pinned WikiText-2 test paragraphs (128 tokens). They have 1–6 singleton experts. This is a narrow first-layer diagnostic sample, not a generation run or corpus-wide evaluation.
+
+All 27 checkpoint-backed BF16 GPU cases pass both FP32 and upstream BF16 comparisons (atol 0.02, rtol 0.03); maximum relative L2 error versus FP32 is 0.00317. They use actual first-layer expert weights and prefix hidden states, 20 warmups per graph phase and 100 replays. T=1/8 are prefill state subsets; full prompts have 87–93 tokens. Attention/router work is excluded. This is not end-to-end model latency or a quality evaluation.
+
 ## Future work and scope adjustments
 
-First, rerun the exact benchmark on an L40S or A6000 with stable power and clock conditions, recording repeated trials and both eager and graph timing. Compare with a stronger external grouped-GEMM backend before claiming a general performance benefit.
+Rerun on an L40S or A6000 with stable power/clocks and a competitive external grouped-GEMM backend. The native PyTorch grouped-mm API was profiled here and uses a host-loop fallback (3 grouped calls expand to 192 matrix-multiply calls).
 
-Second, use isolated down/combine profiling to tune occupancy thresholds 1, 2 and 4 and combine tile sizes, then validate chosen settings on separate full-block runs and new seeds. Include the extra metadata/scheduling cost. Keep threshold 0 as a control.
-
-Third, capture real prefill and decode routing traces from pretrained OLMoE on public text using the supplied capture script, replay the observed occupancies, and investigate whether their workload regimes differ from synthetic routing. Full-model latency, H100 evaluation and broad threshold generalization remain stretch goals.
-
-The scope remains a single expert block with an explicit numerical policy. We have not established complete transformer-layer or end-to-end language-model speedups, quality preservation, measured memory-traffic reduction, or target-cluster performance.
+Extend real-route collection to more prompts, later layers and actual decode. Collect Nsight memory counters and test model quality before any broader claim. The current scope remains one expert block; full-model and H100 evaluation are stretch goals. Existing defaults remain unchanged because fusion gains are unproven.
 
 ## Blockers and limitations
 
 The initial Windows environment was CPU-only and had insufficient free C-drive space for CUDA PyTorch. We resolved local GPU execution by creating an isolated Linux/WSL environment backed by D-drive storage. The remaining power/clock constraint is documented rather than treated as normal GPU performance.
 
-Cluster execution and pretrained routing collection remain unverified. No external experiment-tracking dashboard is connected. Team UNIs, confirmed role assignments and the dashboard URL must be completed before submission. The supplied template mentions four to five students, while the proposal lists three; confirm the approved team-size arrangement with the course.
+Cluster execution, later-layer/decode tracing and model quality remain unverified. No external experiment-tracking dashboard is connected. Team UNIs, confirmed role assignments and the dashboard URL must be completed before submission. The supplied template mentions four to five students, while the proposal lists three; confirm the approved team-size arrangement with the course.
 
 ## Project links and references
 
 Repository: https://github.com/SrikarKovvuri/moe-kernel-inference
 
 Versioned experiment archive: https://github.com/SrikarKovvuri/moe-kernel-inference/tree/main/reports/results
+
+Follow-up methods and evidence: https://github.com/SrikarKovvuri/moe-kernel-inference/blob/main/reports/followup-analysis.md
 
 Experiment tracking dashboard: pending team-provided accessible URL. The archive contains JSON evidence and figures; it is not a claim that a W&B dashboard exists.
 
@@ -100,8 +108,17 @@ Locality-aware MoE kernels: https://pytorch.org/blog/accelerating-moe-model/
 
 Triton grouped GEMM tutorial: https://triton-lang.org/main/getting-started/tutorials/08-grouped-gemm.html
 
-## Observed synthetic occupancy
+## Observed pretrained first-layer occupancy
 
-![Uniform synthetic expert occupancy](figures/uniform/occupancy.png)
+Intel Core Ultra 9 185H, CPU BF16, upstream eager causal attention, batch 1; context length below. Each row is one prefill capture, not a latency measurement. No warmup/repetitions apply to these deterministic occupancy counts. Checkpoint and source hashes are archived.
 
-Additional latency and occupancy figures are in [figures](figures).
+| Probe | Context tokens | Singleton experts | Maximum occupancy |
+| --- | --- | --- | --- |
+| Authored 1 | 88 | 4 | 71 |
+| Authored 2 | 87 | 1 | 79 |
+| Authored 3 | 93 | 6 | 69 |
+| WikiText-2 1 | 128 | 2 | 90 |
+| WikiText-2 2 | 128 | 3 | 94 |
+| WikiText-2 3 | 128 | 2 | 104 |
+
+Additional latency and occupancy plots are in [figures](figures).

@@ -1,7 +1,7 @@
 # Midpoint evidence
 
-Read [midpoint-report.md](midpoint-report.md) or the editable
-[midpoint-report.docx](midpoint-report.docx). Both are drafts for team review:
+Read the [PDF](midpoint-report.pdf), [Markdown](midpoint-report.md), or editable
+[Word report](midpoint-report.docx). These are drafts for team review:
 UNIs, confirmed roles, the dashboard URL, and team-size approval still need team input.
 
 The initial result is **no consistent singleton-fusion speedup** against this
@@ -12,7 +12,8 @@ tolerance, but the laptop GPU was heavily power/clock constrained.
 [Follow-up experiments](followup-analysis.md) add 45 graph cases, a 216-candidate
 threshold/tile sweep, native-backend execution profiling, and genuine pretrained
 first-layer prefill occupancy. These do not replace or silently extend the initial
-eager table. The initial midpoint draft predates these follow-up experiments.
+eager table. The updated midpoint draft separates its initial table from follow-up
+validation; the extended analysis retains the detailed comparison tables.
 
 ## Evidence files
 
@@ -39,6 +40,16 @@ eager table. The initial midpoint draft predates these follow-up experiments.
 - `first-layer-routes/`: pretrained layer-0 prefill routes from three authored
   text probes; pinned checkpoint revision and per-tensor checksums. This small
   diagnostic sample is not representative of a corpus or later model layers.
+- `wikitext-routes/`: three pinned public WikiText-2 test paragraph captures at
+  context 128, with source attribution and hashes; raw dataset text is not committed.
+- `results/pretrained-block.json`: 27 checkpoint-backed BF16 GPU cases, using
+  actual expert weights and prefix hidden states. Every case passes both FP32 and
+  upstream BF16 comparisons. See its [source audit](results/pretrained-block-provenance.md)
+  for the preserved dirty-tree flag; these remain single-block graph measurements.
+- `results/ablation-graph.json`: 126 full-block measurements across 18 independent
+  seed/shape/routing cases, separating dispatch improvements from fusion.
+- `results/ablation-eager.json`: the same 126 randomized measurements in eager
+  execution, with before/after grouped controls and three independent route seeds.
 
 All initial measurements use synthetic random expert weights and routes at OLMoE
 dimensions. No checkpoint weights, real prompts, or model quality results are
