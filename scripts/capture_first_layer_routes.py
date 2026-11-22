@@ -39,7 +39,7 @@ def main():
     config = AutoConfig.from_pretrained(args.model, revision=revision, trust_remote_code=False)
     if config.model_type != "olmoe":
         p.error("this prefix only supports OLMoE")
-    prefix = FirstLayerRouter(config).bfloat16().eval()
+    prefix = FirstLayerRouter(config).to_inference()
     names = [prefix.checkpoint_key(name) for name in prefix.state_dict()]
     tensors, manifest = fetch_prefix_weights(args.model, revision, names, args.cache)
     if args.download_only:

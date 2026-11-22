@@ -42,6 +42,37 @@ def test_prefix_matches_first_router_of_full_upstream_model(dtype, tokens):
     torch.testing.assert_close(actual_routes.weights, expected_routes.weights, atol=0, rtol=0)
 
 
+def test_prefix_matches_pretrained_loading_precision(tmp_path):
+    config = OlmoeConfig(
+        vocab_size=101,
+        hidden_size=128,
+        intermediate_size=48,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        num_key_value_heads=2,
+        num_experts=8,
+        num_experts_per_tok=2,
+    )
+    torch.manual_seed(7)
+    OlmoeForCausalLM(config).save_pretrained(tmp_path)
+    full = OlmoeForCausalLM.from_pretrained(
+        tmp_path, torch_dtype=torch.bfloat16, attn_implementation="eager"
+    ).eval()
+    prefix = FirstLayerRouter(config).to_inference()
+    source = full.state_dict()
+    prefix.load_state_dict(
+        {name: source[prefix.checkpoint_key(name)] for name in prefix.state_dict()}
+    )
+    assert prefix.rotary_emb.inv_freq.dtype == torch.float32
+    torch.testing.assert_close(
+        prefix.rotary_emb.inv_freq, full.model.rotary_emb.inv_freq, atol=0, rtol=0
+    )
+    inputs = torch.randint(0, 101, (1, 47))
+    with torch.inference_mode():
+        expected = full(inputs, output_router_logits=True, use_cache=False).router_logits[0]
+    torch.testing.assert_close(prefix(inputs), expected, atol=0, rtol=0)
+
+
 @pytest.mark.parametrize(
     "status,content_range,payload",
     [

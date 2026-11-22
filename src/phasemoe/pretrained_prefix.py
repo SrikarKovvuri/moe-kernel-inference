@@ -31,6 +31,13 @@ class FirstLayerRouter(nn.Module):
         self.gate = nn.Linear(config.hidden_size, config.num_experts, bias=False)
         self.rotary_emb = OlmoeRotaryEmbedding(config=config)
 
+    def to_inference(self, *, device="cpu", dtype=torch.bfloat16):
+        """Match from_pretrained: BF16 parameters, freshly computed FP32 RoPE buffer."""
+        self.to(device=device, dtype=dtype)
+        # Casting an already-rounded BF16 frequency buffer back to FP32 is lossy.
+        self.rotary_emb = type(self.rotary_emb)(config=self.config).to(device=device)
+        return self.eval()
+
     @torch.inference_mode()
     def forward(self, input_ids):
         if input_ids.ndim != 2 or input_ids.shape[0] != 1 or input_ids.shape[1] < 1:
