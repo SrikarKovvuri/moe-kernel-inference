@@ -90,6 +90,46 @@ Three deterministic long paragraphs from a pinned, tokenized WikiText-2 test spl
 
 [Public-text capture evidence](wikitext-routes) · [WikiText attribution and license](https://huggingface.co/datasets/Salesforce/wikitext)
 
+## Pretrained expert-block validation
+
+All 27 BF16 cases passed both the FP32 reference and upstream BF16 module comparison at atol 0.02 / rtol 0.03. Unlike route replay, these cases use actual checkpoint expert weights and actual hidden states from the first attention/norm prefix. The maximum relative L2 errors were 0.00317 versus FP32 and 0.00519 versus upstream BF16.
+
+Graph timings use 20 warmups per phase and 100 samples, default sort dispatch, threshold 1 and a 32 × 128 combine tile. They include expert dispatch but exclude attention, normalization and router computation. T=1/8 rows are suffix subsets of prefill hidden states, not decode. Full-prompt cases contain 87–93 tokens. The three authored prompts do not establish model quality or later-layer behavior.
+
+| Prompt | T | Phase | Backend | CUDA-event median ms |
+| --- | --- | --- | --- | --- |
+| technical | 1 | prefill_state_subset | triton_fused | 10.9481 |
+| technical | 1 | prefill_state_subset | triton_hybrid | 11.0029 |
+| technical | 1 | prefill_state_subset | triton_grouped | 11.0085 |
+| technical | 8 | prefill_state_subset | triton_hybrid | 46.1926 |
+| technical | 8 | prefill_state_subset | triton_grouped | 46.2669 |
+| technical | 8 | prefill_state_subset | triton_fused | 49.1223 |
+| technical | 88 | prefill | triton_fused | 99.2271 |
+| technical | 88 | prefill | triton_hybrid | 83.6188 |
+| technical | 88 | prefill | triton_grouped | 83.4924 |
+| narrative | 1 | prefill_state_subset | triton_grouped | 11.0080 |
+| narrative | 1 | prefill_state_subset | triton_hybrid | 11.0152 |
+| narrative | 1 | prefill_state_subset | triton_fused | 10.9670 |
+| narrative | 8 | prefill_state_subset | triton_grouped | 47.6134 |
+| narrative | 8 | prefill_state_subset | triton_hybrid | 47.6022 |
+| narrative | 8 | prefill_state_subset | triton_fused | 49.5939 |
+| narrative | 87 | prefill | triton_hybrid | 89.4346 |
+| narrative | 87 | prefill | triton_fused | 102.6463 |
+| narrative | 87 | prefill | triton_grouped | 89.0839 |
+| structured | 1 | prefill_state_subset | triton_hybrid | 11.0223 |
+| structured | 1 | prefill_state_subset | triton_grouped | 11.0090 |
+| structured | 1 | prefill_state_subset | triton_fused | 10.9732 |
+| structured | 8 | prefill_state_subset | triton_fused | 48.0671 |
+| structured | 8 | prefill_state_subset | triton_hybrid | 46.2674 |
+| structured | 8 | prefill_state_subset | triton_grouped | 46.1906 |
+| structured | 93 | prefill | triton_fused | 103.5633 |
+| structured | 93 | prefill | triton_hybrid | 86.4046 |
+| structured | 93 | prefill | triton_grouped | 86.3898 |
+
+[Pretrained block evidence and tensor checksums](results/pretrained-block.json)
+
+The pretrained artifact preserves a dirty-working-tree flag from concurrent report archiving. A [source audit](results/pretrained-block-provenance.md) verifies that the measured benchmark and kernel files match the recorded revision.
+
 ## Interpretation
 
 The measured fusion hypothesis remains unproven. Keep the grouped baseline and existing defaults, report dispatch separately, and rerun on the proposed cluster GPU with stable power/clocks. Broader real-route sampling, a competitive external grouped kernel, memory counters and full-model quality evaluation remain open work.

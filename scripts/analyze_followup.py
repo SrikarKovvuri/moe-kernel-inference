@@ -100,7 +100,7 @@ def plot_ablation(rows, output, mode):
     fig.tight_layout(rect=(0, 0.16, 1, 0.95))
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output.with_suffix(".png"), dpi=180)
-    fig.savefig(output.with_suffix(".pdf"))
+    fig.savefig(output.with_suffix(".pdf"), metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
 
 
@@ -301,6 +301,9 @@ def main():
                 ],
             ),
             "[Pretrained block evidence and tensor checksums](results/pretrained-block.json)",
+            "The pretrained artifact preserves a dirty-working-tree flag from concurrent "
+            "report archiving. A [source audit](results/pretrained-block-provenance.md) verifies "
+            "that the measured benchmark and kernel files match the recorded revision.",
         ]
     text += [
         "## Interpretation",
