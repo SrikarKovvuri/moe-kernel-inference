@@ -174,6 +174,23 @@ sample, or end-to-end inference benchmark. The original full-model script remain
 the route for actual generation/decode collection on a sufficiently large machine.
 See [Hugging Face's safetensors range-reading documentation](https://huggingface.co/docs/safetensors/en/metadata_parsing).
 
+For a stronger numerical check, the first expert block can be loaded separately
+(another 768 MiB of checkpoint tensors) and evaluated on real prefix hidden states:
+
+```sh
+python scripts/benchmark_pretrained_block.py --tokens 1 8 0 \
+  --backends triton_grouped triton_hybrid triton_fused --mode cuda_graph \
+  --output runs/pretrained-block.json
+```
+
+Here `0` selects the complete prompt; `1` and `8` select the last prefill states.
+Those subsets are **not generation/decode runs**. Every candidate must pass both
+the FP32 reference and upstream BF16 module comparison before timing. The block
+benchmark excludes attention, normalization and router computation. Checkpoint
+weights remain in a local safetensors cache and are not committed. The optional
+model integration is pinned to Transformers 4.46.3, whose numerical behavior is
+covered by the tests.
+
 ## Team
 
 Aedin Pereira, Srikar Kovvuri, David Samtani. UNIs and confirmed role assignments

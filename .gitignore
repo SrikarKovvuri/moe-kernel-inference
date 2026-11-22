@@ -10,6 +10,7 @@ dist/
 runs/
 *.pt
 *.pth
+*.safetensors
 *.nsys-rep
 *.ncu-rep
 .env

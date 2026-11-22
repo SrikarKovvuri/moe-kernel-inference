@@ -39,7 +39,7 @@ class FirstLayerRouter(nn.Module):
         return self.eval()
 
     @torch.inference_mode()
-    def forward(self, input_ids):
+    def hidden_states(self, input_ids):
         if input_ids.ndim != 2 or input_ids.shape[0] != 1 or input_ids.shape[1] < 1:
             raise ValueError("prefix supports one unpadded, nonempty prompt at a time")
         hidden = self.embed_tokens(input_ids)
@@ -59,7 +59,11 @@ class FirstLayerRouter(nn.Module):
             use_cache=False,
         )
         normalized = self.post_attention_layernorm(hidden + attended)
-        return self.gate(normalized.reshape(-1, self.config.hidden_size))
+        return normalized.reshape(-1, self.config.hidden_size)
+
+    @torch.inference_mode()
+    def forward(self, input_ids):
+        return self.gate(self.hidden_states(input_ids))
 
     @staticmethod
     def checkpoint_key(name):
@@ -95,7 +99,7 @@ def read_range(url, start, end):
         return payload
 
 
-def fetch_prefix_weights(model_id, revision, names, cache_dir):
+def fetch_prefix_weights(model_id, revision, names, cache_dir, *, cache_name="first-router"):
     """Explicit network operation for a pinned public checkpoint, cached as safetensors."""
     from huggingface_hub import hf_hub_download, hf_hub_url
     from safetensors.torch import load_file, save_file
@@ -103,12 +107,20 @@ def fetch_prefix_weights(model_id, revision, names, cache_dir):
     if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
         raise ValueError("use a resolved 40-character checkpoint commit")
     cache = Path(cache_dir) / model_id.replace("/", "--") / revision
-    weights_path, manifest_path = cache / "first-router.safetensors", cache / "manifest.json"
+    if not cache_name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in cache_name):
+        raise ValueError("cache_name must contain lowercase letters, digits or hyphens")
+    weights_path = cache / f"{cache_name}.safetensors"
+    manifest_path = cache / (
+        "manifest.json" if cache_name == "first-router" else f"{cache_name}.json"
+    )
     if weights_path.exists() and manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
         if hashlib.sha256(weights_path.read_bytes()).hexdigest() != manifest["cache_sha256"]:
             raise ValueError("cached prefix weights failed their checksum")
-        return load_file(str(weights_path)), manifest
+        tensors = load_file(str(weights_path))
+        if set(tensors) != set(names):
+            raise ValueError("cached tensor set does not match the requested checkpoint subset")
+        return tensors, manifest
     index = json.loads(
         Path(
             hf_hub_download(model_id, "model.safetensors.index.json", revision=revision)
