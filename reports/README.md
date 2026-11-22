@@ -56,6 +56,9 @@ validation; the extended analysis retains the detailed comparison tables.
   `pretrained-wikitext-graph.json`: 27 cases each, separating authored/public inputs
   and eager/graph execution. These extend the detailed follow-up analysis; the
   midpoint report retains its original tables and explicitly identified follow-ups.
+- `results/pretrained-wikitext-long-graph.json`: nine graph cases on three contiguous
+  public-text passages, each truncated to 512 tokens. They have 0–1 singleton
+  experts; actual pretrained weights and hidden states are used.
 
 All initial measurements use synthetic random expert weights and routes at OLMoE
 dimensions. No checkpoint weights, real prompts, or model quality results are

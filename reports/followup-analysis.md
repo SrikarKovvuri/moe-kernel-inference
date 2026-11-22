@@ -225,6 +225,22 @@ Within this mode, grouped/selective ratios span 0.9823–1.0050. Do not mix thes
 
 [Raw supplemental evidence](results/pretrained-wikitext-eager.json)
 
+## Longer public-text prefill, graph replay
+
+All 9 cases passed the same two numerical comparisons. Maximum relative L2 error against FP32: 0.00313. Timing mode is cuda_graph, with 20 warmups and 100 measurements per variant (graph mode also records capture/replay warmups). Hardware, BF16 dimensions and expert-block scope match the development setup. Where present, T=1/8 are prefill-state subsets, not decode. Inputs/weights are pretrained; only backend order is randomized. These are narrow probe comparisons, not independent timing trials or corpus-level quality evaluation.
+
+Within this mode, grouped/selective ratios span 0.9607–0.9650. Do not mix these numbers with the other timing mode or route-only replay.
+
+| Probe | T | Grouped ms | Selective ms | Uniform fused ms |
+| --- | --- | --- | --- | --- |
+| wikitext-line-4 | 512 | 92.0044 | 95.6370 | 311.0364 |
+| wikitext-line-2179 | 512 | 93.2332 | 97.0465 | 311.8956 |
+| wikitext-line-4341 | 512 | 93.3135 | 96.6943 | 311.9130 |
+
+[Raw supplemental evidence](results/pretrained-wikitext-long-graph.json)
+
+These longer inputs join adjacent WikiText source lines into contiguous passages of at least 4000 characters, then tokenize/truncate to 512 tokens. Start/end source lines and hashes are retained. Singleton counts span 0–1 across these three prompts. A zero count means threshold-1 fusion has no light-expert work to optimize. This is a separate probe set from the 128-token paragraph comparison.
+
 ## Matched router-inclusive upstream comparison
 
 All 27 cases passed both numerical checks. These eager measurements include router projection, FP32 softmax, top-k selection, route-weight casting, dispatch and expert computation for every backend, with 20 warmups and 100 samples. Attention and normalization are excluded. The same pretrained authored probes and T=1/8/full prefill-state selections are used.

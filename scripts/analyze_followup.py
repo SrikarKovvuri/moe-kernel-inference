@@ -355,6 +355,16 @@ def main():
             ),
             f"[Raw supplemental evidence](results/{filename})",
         ]
+        if filename == "pretrained-wikitext-long-graph.json":
+            singleton_counts = [r["occupancy"]["singleton_experts"] for r in rows]
+            text += [
+                "These longer inputs join adjacent WikiText source lines into contiguous "
+                "passages of at least 4000 characters, then tokenize/truncate to 512 tokens. "
+                "Start/end source lines and hashes are retained. Singleton counts span "
+                f"{min(singleton_counts)}–{max(singleton_counts)} across these three prompts. "
+                "A zero count means threshold-1 fusion has no light-expert work to optimize. "
+                "This is a separate probe set from the 128-token paragraph comparison."
+            ]
     whole_path = root / "results/pretrained-whole-moe.json"
     if whole_path.exists():
         whole = read(whole_path)
