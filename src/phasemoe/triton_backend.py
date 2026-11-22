@@ -28,6 +28,7 @@ class KernelConfig:
     combine_n: int = 32
     combine_k: int = 128
     num_warps: int = 4
+    packing: str = "torch"
 
     def __post_init__(self):
         for name in ("block_m", "block_n", "block_k", "combine_n", "combine_k"):
@@ -36,6 +37,8 @@ class KernelConfig:
                 raise ValueError(f"{name} must be a power of two >= 16")
         if self.num_warps not in (4, 8):
             raise ValueError("num_warps must be 4 or 8")
+        if self.packing not in ("torch", "triton_scan"):
+            raise ValueError("packing must be torch or triton_scan")
 
 
 if triton is not None:
@@ -201,6 +204,10 @@ def require_triton(x):
 
 
 def prepare(routing: Routing, config: KernelConfig):
+    if config.packing == "triton_scan":
+        from .dispatch import pack_routes_triton
+
+        return pack_routes_triton(routing, block_m=config.block_m)
     packed = pack_routes(routing)
     tile_ends = ((packed.counts + config.block_m - 1) // config.block_m).cumsum(0)
     return packed, tile_ends

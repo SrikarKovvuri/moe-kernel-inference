@@ -202,6 +202,7 @@ def run_case(
     repetitions,
     mode="eager",
     trace_path=None,
+    kernel_config=None,
 ):
     provenance = None
     if trace_path is None:
@@ -224,9 +225,14 @@ def run_case(
     validate_inputs(x, weights, routing)
     if backend == "torch":
         fn = partial(moe_torch, x, weights, routing)
-    else:
-        from .triton_backend import moe_triton
+    elif backend == "torch_grouped":
+        from .torch_grouped import moe_torch_grouped
 
+        fn = partial(moe_torch_grouped, x, weights, routing)
+    else:
+        from .triton_backend import KernelConfig, moe_triton
+
+        kernel_config = kernel_config or KernelConfig()
         fn = partial(
             moe_triton,
             x,
@@ -234,6 +240,7 @@ def run_case(
             routing,
             threshold=threshold,
             strategy=backend.removeprefix("triton_"),
+            config=kernel_config,
         )
     actual = fn()
     # FP32 expert baseline scales to full dimensions; independent token oracle is
@@ -264,6 +271,13 @@ def run_case(
         "seed": seed,
         "dtype": str(dtype),
         "backend": backend,
+        "kernel_config": asdict(kernel_config) if backend.startswith("triton_") else None,
+        "backend_caveat": (
+            "Native grouped-mm API; architecture-dependent host-loop fallback is possible. "
+            "A profiler trace is needed to identify the actual kernels."
+            if backend == "torch_grouped"
+            else None
+        ),
         "threshold": threshold,
         "effective_threshold": 0
         if backend == "triton_grouped"
@@ -301,12 +315,15 @@ def main(argv=None):
     parser.add_argument(
         "--backends",
         nargs="+",
-        choices=["torch", "triton_grouped", "triton_hybrid", "triton_fused"],
+        choices=["torch", "torch_grouped", "triton_grouped", "triton_hybrid", "triton_fused"],
         default=["torch"],
     )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dtype", choices=["float32", "bfloat16", "float16"], default="float32")
     parser.add_argument("--threshold", type=int, default=1)
+    parser.add_argument("--packing", choices=["torch", "triton_scan"], default="torch")
+    parser.add_argument("--combine-n", type=int, default=32)
+    parser.add_argument("--combine-k", type=int, default=128)
     parser.add_argument(
         "--routing-trace",
         type=Path,
@@ -324,13 +341,22 @@ def main(argv=None):
     if args.threads < 1:
         parser.error("threads must be positive")
     if args.mode == "cuda_graph" and (
-        torch.device(args.device).type != "cuda" or "torch" in args.backends
+        torch.device(args.device).type != "cuda"
+        or any(not backend.startswith("triton_") for backend in args.backends)
     ):
-        parser.error("CUDA graphs require CUDA and Triton backends (torch uses dynamic nonzero)")
+        parser.error("CUDA graphs require CUDA and Triton backends; native fallbacks may sync")
     if torch.device(args.device).type == "cuda" and not torch.cuda.is_available():
         parser.error("CUDA requested but unavailable; use --device cpu for logic validation")
     torch.set_num_threads(args.threads)
     config = MoEConfig.tiny() if args.preset == "tiny" else MoEConfig()
+    from .triton_backend import KernelConfig
+
+    try:
+        kernel_config = KernelConfig(
+            packing=args.packing, combine_n=args.combine_n, combine_k=args.combine_k
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.routing_trace:
         from .traces import load_trace
 
@@ -369,6 +395,7 @@ def main(argv=None):
                         repetitions=args.repetitions,
                         mode=args.mode,
                         trace_path=args.routing_trace,
+                        kernel_config=kernel_config,
                     )
                     report["results"].append(result)
                     write_json(args.output, report)

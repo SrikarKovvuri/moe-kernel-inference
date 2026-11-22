@@ -83,6 +83,20 @@ and excludes Python launch work within the block. It is a different timing mode,
 not a drop-in replacement for eager latency. Captured inputs and shapes are fixed;
 the test suite verifies that changing routing values recomputes the correct output.
 
+Additional controlled alternatives are available:
+
+- `--backends torch_grouped` calls PyTorch's native grouped-mm API (PyTorch 2.9
+  in our environment). Some architectures/dtypes use a host-loop fallback; an API
+  name alone does not establish execution by a fast grouped GPU kernel. This backend
+  is eager-only in the benchmark and requires dimensions aligned to 16-byte strides.
+- `--packing triton_scan` replaces stable sort/scatter dispatch with two Triton
+  launches for 1–4096 assignments. It scans all assignments per expert, so its
+  O(experts × assignments) work is intended for small batches. It raises an error
+  outside that range; empty expert blocks still return an empty output.
+- `--combine-n` and `--combine-k` expose the reduction tile sizes for independent
+  reruns of tuning choices. JSON records the actual Triton configuration. Defaults
+  retain the original sort-based dispatcher and 32 × 128 combine tile.
+
 ## Profiling and tuning
 
 ```sh

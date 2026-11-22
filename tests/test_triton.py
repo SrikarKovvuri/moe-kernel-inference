@@ -53,8 +53,11 @@ def test_hybrid_matches_grouped_and_torch(distribution, tokens):
         assert metrics["passed"], metrics
 
 
-def test_graph_replay_recomputes_routing_and_outputs():
-    from phasemoe.triton_backend import moe_triton
+@pytest.mark.parametrize("packing", ["torch", "triton_scan"])
+def test_graph_replay_recomputes_routing_and_outputs(packing):
+    from phasemoe.triton_backend import KernelConfig, moe_triton
+
+    config = KernelConfig(packing=packing)
 
     c = MoEConfig.tiny()
     w = ExpertWeights.random(c, device="cuda", dtype=torch.bfloat16)
@@ -64,11 +67,11 @@ def test_graph_replay_recomputes_routing_and_outputs():
     stream.wait_stream(torch.cuda.current_stream())
     with torch.cuda.stream(stream):
         for _ in range(3):
-            moe_triton(x, w, r)
+            moe_triton(x, w, r, config=config)
     torch.cuda.current_stream().wait_stream(stream)
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph, stream=stream):
-        actual = moe_triton(x, w, r)
+        actual = moe_triton(x, w, r, config=config)
     for distribution in ("uniform", "skewed", "balanced"):
         fresh = synthetic_routing(c, 8, distribution, seed=42).to("cuda")
         r.expert_ids.copy_(fresh.expert_ids)

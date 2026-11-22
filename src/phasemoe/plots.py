@@ -25,10 +25,17 @@ def load_report(path):
             r["threshold"],
             r["timing"]["warmup"],
             r["timing"]["repetitions"],
+            json.dumps(r.get("kernel_config"), sort_keys=True)
+            if r["backend"].startswith("triton_")
+            else None,
         )
         for r in data["results"]
     }
-    if len(signatures) != 1:
+    # Non-Triton rows have no Triton configuration; compare their common fields.
+    if (
+        len({s[:-1] for s in signatures}) != 1
+        or len({s[-1] for s in signatures if s[-1] is not None}) > 1
+    ):
         raise ValueError("split mixed shapes/dtypes/scopes/timing modes into separate reports")
     return data
 
@@ -62,12 +69,14 @@ def make_plots(report, output, note=None):
     bottom = 0.22 if len(distributions) == 1 else 0.15
     colors = {
         "torch": "#777777",
+        "torch_grouped": "#8B5998",
         "triton_grouped": "#304E78",
         "triton_hybrid": "#B15B35",
         "triton_fused": "#567D64",
     }
     labels = {
         "torch": "PyTorch expert loop",
+        "torch_grouped": "PyTorch native grouped API",
         "triton_grouped": "Triton grouped",
         "triton_hybrid": f"Selective (threshold {first['threshold']})",
         "triton_fused": "Uniformly fused",
