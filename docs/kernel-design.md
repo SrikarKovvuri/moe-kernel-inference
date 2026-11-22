@@ -31,6 +31,12 @@ Excess programs exit before matrix multiplication. This simple schedule is a
 research baseline; persistent scheduling and metadata lookup costs remain tuning
 opportunities.
 
+An optional small-batch dispatcher scans assignment IDs once per expert. A prefix
+sum places each expert's assignments in stable order, and a second launch computes
+the GEMM tile ends. Tests require exact equality with sort/scatter metadata. This
+has O(E × A) work and is deliberately restricted to 1–4096 assignments. It is a
+separate optimization from down/combine fusion and is not enabled by default.
+
 ## Three strategies
 
 1. **Grouped**: all active experts use grouped down GEMM; combine reads projected rows.

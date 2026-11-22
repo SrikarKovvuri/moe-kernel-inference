@@ -9,6 +9,11 @@ repository's grouped Triton baseline. It is not a comparison with the strongest
 production backend. All 60 full-shape BF16 cases passed the recorded correctness
 tolerance, but the laptop GPU was heavily power/clock constrained.
 
+[Follow-up experiments](followup-analysis.md) add 45 graph cases, a 216-candidate
+threshold/tile sweep, native-backend execution profiling, and genuine pretrained
+first-layer prefill occupancy. These do not replace or silently extend the initial
+eager table. The initial midpoint draft predates these follow-up experiments.
+
 ## Evidence files
 
 - `results/olmoe-bf16-initial.json`: 60 cases, 100 measured eager calls and 20 warmups
@@ -25,6 +30,15 @@ tolerance, but the laptop GPU was heavily power/clock constrained.
   `nvidia-smi` snapshots per case.
 - `figures/`: regenerated latency and occupancy plots. Latency bands are p10–p90
   over repeated timing samples, not confidence intervals across independent runs.
+- `results/olmoe-bf16-graph.json`: 45 graph cases, same full dimensions and 100
+  measured replays; graph warmup/capture counts are explicit in every result.
+- `results/tuning-down-combine.json`: randomized isolated-phase search, 216
+  candidates, 10 warmups and 30 samples, with grouped controls before/after each case.
+- `results/native-profile.json` and `native-trace.json`: evidence that native
+  PyTorch grouped-mm uses its host-loop fallback on this SM89 device/software.
+- `first-layer-routes/`: pretrained layer-0 prefill routes from three authored
+  text probes; pinned checkpoint revision and per-tensor checksums. This small
+  diagnostic sample is not representative of a corpus or later model layers.
 
 All initial measurements use synthetic random expert weights and routes at OLMoE
 dimensions. No checkpoint weights, real prompts, or model quality results are
@@ -41,6 +55,7 @@ python -m phasemoe.plots reports/results/olmoe-bf16-initial.json \
 python scripts/build_midpoint_report.py \
   --benchmark reports/results/olmoe-bf16-initial.json \
   --profile reports/results/profile-eager.json --output reports
+python scripts/analyze_followup.py --reports reports
 ```
 
 The report builder requires `python-docx`; render the DOCX and inspect every page

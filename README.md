@@ -26,6 +26,9 @@ do not establish L40S/A6000 performance. See the [midpoint draft](reports/midpoi
 [editable report](reports/midpoint-report.docx), [raw evidence](reports/results), and
 [figures](reports/figures).
 
+The [follow-up analysis](reports/followup-analysis.md) separates graph timing,
+threshold/tile tuning, native backend profiling, and pretrained first-layer routes.
+
 The expert block includes dispatch, gate/up projections, SiLU multiplication, down
 projection, routing weights, and output reduction. Transformer attention, RMSNorm,
 router logits/top-k selection, and model loading are outside the initial benchmark.
