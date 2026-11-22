@@ -73,7 +73,8 @@ def main():
         )
         path = args.output / f"probe-{index:02d}-prefill.json"
         provenance = dict(
-            source="pretrained_first_layer_prefix",
+            source="pretrained_model",
+            capture_method="exact_first_layer_prefix",
             model=args.model,
             model_revision=revision,
             layer=0,
