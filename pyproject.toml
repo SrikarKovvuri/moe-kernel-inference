@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phasemoe"
+version = "0.1.0"
+description = "Reproducible expert-selective fusion experiments for MoE inference"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.5", "numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.9"]
+plots = ["matplotlib>=3.8"]
+gpu = ["triton>=3.1,<3.6; sys_platform == 'linux'", "triton-windows>=3.5,<3.6; sys_platform == 'win32'"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["cuda: requires a CUDA GPU", "triton: requires CUDA and Triton"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

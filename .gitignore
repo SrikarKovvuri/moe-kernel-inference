@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.triton-cache/
+runs/
+*.pt
+*.pth
+*.nsys-rep
+*.ncu-rep
+.env
+.env.*
+!.env.example
