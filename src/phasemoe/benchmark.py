@@ -75,7 +75,15 @@ def environment(device):
         ),
         "float32_matmul_precision": torch.get_float32_matmul_precision(),
     }
-    for package in ("triton", "triton-windows", "numpy"):
+    for package in (
+        "triton",
+        "triton-windows",
+        "numpy",
+        "transformers",
+        "accelerate",
+        "safetensors",
+        "huggingface-hub",
+    ):
         try:
             result[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
