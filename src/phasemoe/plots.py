@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import textwrap
 from pathlib import Path
 
 
@@ -32,7 +33,7 @@ def load_report(path):
     return data
 
 
-def make_plots(report, output):
+def make_plots(report, output, note=None):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -53,7 +54,12 @@ def make_plots(report, output):
         f"Synthetic weights, {route_source} routes; expert block incl. dispatch; source {date}, "
         f"commit {str(report['environment']['git_commit'])[:7]}"
     )
+    if note:
+        caption += "\n" + note
     distributions = list(dict.fromkeys(r["distribution"] for r in rows))
+    if len(distributions) == 1:
+        caption = "\n".join(textwrap.fill(line, 80) for line in caption.splitlines())
+    bottom = 0.22 if len(distributions) == 1 else 0.15
     colors = {
         "torch": "#777777",
         "triton_grouped": "#304E78",
@@ -70,7 +76,7 @@ def make_plots(report, output):
         if metric not in first["timing"]:
             continue
         fig, axes = plt.subplots(
-            1, len(distributions), figsize=(5 * len(distributions), 4.9), squeeze=False
+            1, len(distributions), figsize=(5 * len(distributions), 5.5), squeeze=False
         )
         for ax, distribution in zip(axes[0], distributions):
             selected = [r for r in rows if r["distribution"] == distribution]
@@ -92,7 +98,7 @@ def make_plots(report, output):
         title = "Synchronized wall latency" if metric == "wall" else "CUDA-event stream latency"
         fig.suptitle(f"{title} by token count (bands: p10–p90)", fontsize=13)
         fig.text(0.5, 0.02, caption, ha="center", fontsize=8)
-        fig.tight_layout(rect=(0, 0.13, 1, 0.94))
+        fig.tight_layout(rect=(0, bottom, 1, 0.94))
         fig.savefig(output / f"latency-{metric}.png", dpi=180)
         fig.savefig(output / f"latency-{metric}.pdf")
         plt.close(fig)
@@ -102,7 +108,10 @@ def make_plots(report, output):
     for row in rows:
         unique.setdefault((row["distribution"], row["tokens"]), row)
     fig, axes = plt.subplots(
-        1, len(distributions), figsize=(5 * len(distributions), 4.9), squeeze=False
+        1,
+        len(distributions),
+        figsize=(5 * len(distributions), 3.6 if len(distributions) == 1 else 4.9),
+        squeeze=False,
     )
     for ax, distribution in zip(axes[0], distributions):
         series = sorted(
@@ -138,8 +147,15 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("input", type=Path)
     p.add_argument("--output", type=Path, default=Path("runs/figures"))
+    p.add_argument("--note", help="measurement caveat to print in latency figure captions")
+    p.add_argument("--distribution", help="plot only one routing distribution")
     args = p.parse_args(argv)
-    make_plots(load_report(args.input), args.output)
+    report = load_report(args.input)
+    if args.distribution:
+        report["results"] = [r for r in report["results"] if r["distribution"] == args.distribution]
+        if not report["results"]:
+            p.error("selected distribution is absent from this report")
+    make_plots(report, args.output, note=args.note)
 
 
 if __name__ == "__main__":

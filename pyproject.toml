@@ -32,3 +32,4 @@ select = ["E", "F", "I"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/phasemoe/triton_backend.py" = ["E741"]
+"scripts/build_midpoint_report.py" = ["E501"]
