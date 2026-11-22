@@ -5,7 +5,9 @@
 For T tokens, E experts, top-k K, hidden width H, and intermediate width I:
 
 - Inputs: X[T,H], gate/up weights [E,H,I], down weights [E,I,H].
-- Routing: expert IDs [T,K] and FP32 weights [T,K]. IDs are unique per token.
+- Routing: expert IDs [T,K] and floating-point weights [T,K]. Synthetic routes use
+  FP32 weights; pretrained block execution preserves the upstream BF16 cast.
+  IDs are unique per token.
 - Packed assignment rows: A=T*K, sorted by expert; each row retains its token/slot ID.
 - Offsets [E+1] and counts [E] delimit experts. An inverse permutation maps each
   original assignment to its packed row.

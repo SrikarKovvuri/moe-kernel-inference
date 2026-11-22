@@ -50,6 +50,12 @@ validation; the extended analysis retains the detailed comparison tables.
   seed/shape/routing cases, separating dispatch improvements from fusion.
 - `results/ablation-eager.json`: the same 126 randomized measurements in eager
   execution, with before/after grouped controls and three independent route seeds.
+- `results/pretrained-whole-moe.json`: 27 router-inclusive eager cases comparing
+  the actual upstream module, Triton grouped, and selective execution at matched scope.
+- `results/pretrained-eager.json`, `pretrained-wikitext-eager.json`, and
+  `pretrained-wikitext-graph.json`: 27 cases each, separating authored/public inputs
+  and eager/graph execution. These extend the detailed follow-up analysis; the
+  midpoint report retains its original tables and explicitly identified follow-ups.
 
 All initial measurements use synthetic random expert weights and routes at OLMoE
 dimensions. No checkpoint weights, real prompts, or model quality results are

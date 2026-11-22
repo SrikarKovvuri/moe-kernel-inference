@@ -309,6 +309,7 @@ def main():
         ("Public-text checkpoint blocks, graph replay", "pretrained-wikitext-graph.json"),
         ("Authored-probe checkpoint blocks, eager", "pretrained-eager.json"),
         ("Public-text checkpoint blocks, eager", "pretrained-wikitext-eager.json"),
+        ("Longer public-text prefill, graph replay", "pretrained-wikitext-long-graph.json"),
     ]
     for title, filename in supplements:
         path = root / "results" / filename
@@ -334,8 +335,8 @@ def main():
             f"{timing['mode']}, with {timing['warmup']} warmups and {timing['repetitions']} "
             "measurements per variant (graph mode also records capture/replay warmups). "
             "Hardware, BF16 dimensions and expert-block scope match the development setup. "
-            "T=1/8 remain prefill-state subsets, not decode. Inputs/weights are pretrained; "
-            "only backend order is randomized. These are narrow probe comparisons, not "
+            "Where present, T=1/8 are prefill-state subsets, not decode. Inputs/weights are "
+            "pretrained; only backend order is randomized. These are narrow probe comparisons, not "
             "independent timing trials or corpus-level quality evaluation.",
             f"Within this mode, grouped/selective ratios span {min(ratios):.4f}–{max(ratios):.4f}. "
             "Do not mix these numbers with the other timing mode or route-only replay.",

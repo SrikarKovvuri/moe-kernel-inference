@@ -173,8 +173,8 @@ python -m phasemoe.benchmark --preset olmoe --device cuda --dtype bfloat16 \
 ```
 
 The prefix matches the full upstream model's first router logits exactly in small
-FP32/BF16 tests. Captured pretrained routes are limited to **layer 0 prefill on three
-authored text probes**, not a representative corpus, generation run, later-layer
+FP32/BF16 tests. Captured pretrained routes are limited to **layer 0 prefill on a few
+authored and public-text probes**, not a representative corpus, generation run, later-layer
 sample, or end-to-end inference benchmark. The original full-model script remains
 the route for actual generation/decode collection on a sufficiently large machine.
 See [Hugging Face's safetensors range-reading documentation](https://huggingface.co/docs/safetensors/en/metadata_parsing).
@@ -219,6 +219,19 @@ python scripts/prepare_wikitext_probes.py
 python scripts/capture_first_layer_routes.py --probes runs/wikitext-probes.json \
   --max-tokens 128 --output runs/wikitext-routes
 ```
+
+For longer contiguous prefill inputs, join adjacent source lines into passages
+with at least 4000 characters; start/end line numbers are retained:
+
+```sh
+python scripts/prepare_wikitext_probes.py --min-characters 4000 --join-paragraphs \
+  --output runs/wikitext-long-probes.json
+python scripts/benchmark_pretrained_block.py --probes runs/wikitext-long-probes.json \
+  --max-tokens 512 --tokens 0 --mode cuda_graph --output runs/pretrained-wikitext-long-graph.json
+```
+
+The artifact records actual token counts; a character threshold alone does not
+guarantee a particular tokenizer length.
 
 This is the tokenized WikiText test text, not its raw variant, and three selected
 paragraphs do not constitute a benchmark-wide evaluation. Dataset attribution:

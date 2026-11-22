@@ -165,6 +165,86 @@ Graph timings use 20 warmups per phase and 100 samples, default sort dispatch, t
 
 The pretrained artifact preserves a dirty-working-tree flag from concurrent report archiving. A [source audit](results/pretrained-block-provenance.md) verifies that the measured benchmark and kernel files match the recorded revision.
 
+## Public-text checkpoint blocks, graph replay
+
+All 27 cases passed the same two numerical comparisons. Maximum relative L2 error against FP32: 0.00316. Timing mode is cuda_graph, with 20 warmups and 100 measurements per variant (graph mode also records capture/replay warmups). Hardware, BF16 dimensions and expert-block scope match the development setup. Where present, T=1/8 are prefill-state subsets, not decode. Inputs/weights are pretrained; only backend order is randomized. These are narrow probe comparisons, not independent timing trials or corpus-level quality evaluation.
+
+Within this mode, grouped/selective ratios span 0.9964–1.0001. Do not mix these numbers with the other timing mode or route-only replay.
+
+| Probe | T | Grouped ms | Selective ms | Uniform fused ms |
+| --- | --- | --- | --- | --- |
+| wikitext-line-4 | 1 | 11.0060 | 11.0213 | 10.9804 |
+| wikitext-line-4 | 8 | 43.5348 | 43.5384 | 44.4493 |
+| wikitext-line-4 | 128 | 84.4692 | 84.7314 | 119.2934 |
+| wikitext-line-2184 | 1 | 10.9906 | 11.0305 | 10.9737 |
+| wikitext-line-2184 | 8 | 43.5072 | 43.5067 | 46.3631 |
+| wikitext-line-2184 | 128 | 89.9302 | 90.0270 | 122.9865 |
+| wikitext-line-4357 | 1 | 11.0126 | 11.0111 | 10.9599 |
+| wikitext-line-4357 | 8 | 48.9544 | 48.9472 | 51.1964 |
+| wikitext-line-4357 | 128 | 87.2622 | 87.5259 | 121.1428 |
+
+[Raw supplemental evidence](results/pretrained-wikitext-graph.json)
+
+## Authored-probe checkpoint blocks, eager
+
+All 27 cases passed the same two numerical comparisons. Maximum relative L2 error against FP32: 0.00317. Timing mode is eager, with 20 warmups and 100 measurements per variant (graph mode also records capture/replay warmups). Hardware, BF16 dimensions and expert-block scope match the development setup. Where present, T=1/8 are prefill-state subsets, not decode. Inputs/weights are pretrained; only backend order is randomized. These are narrow probe comparisons, not independent timing trials or corpus-level quality evaluation.
+
+Within this mode, grouped/selective ratios span 0.9517–1.0001. Do not mix these numbers with the other timing mode or route-only replay.
+
+| Probe | T | Grouped ms | Selective ms | Uniform fused ms |
+| --- | --- | --- | --- | --- |
+| technical | 1 | 11.9112 | 12.5153 | 12.5317 |
+| technical | 8 | 47.8602 | 47.9667 | 51.1186 |
+| technical | 88 | 85.4728 | 85.6786 | 101.0826 |
+| narrative | 1 | 12.2542 | 12.5143 | 12.6561 |
+| narrative | 8 | 49.7859 | 49.8447 | 51.8605 |
+| narrative | 87 | 91.0828 | 91.5246 | 104.9621 |
+| structured | 1 | 12.2102 | 12.4800 | 12.2383 |
+| structured | 8 | 47.8116 | 47.8454 | 49.7085 |
+| structured | 93 | 88.6528 | 88.6441 | 105.4515 |
+
+[Raw supplemental evidence](results/pretrained-eager.json)
+
+## Public-text checkpoint blocks, eager
+
+All 27 cases passed the same two numerical comparisons. Maximum relative L2 error against FP32: 0.00316. Timing mode is eager, with 20 warmups and 100 measurements per variant (graph mode also records capture/replay warmups). Hardware, BF16 dimensions and expert-block scope match the development setup. Where present, T=1/8 are prefill-state subsets, not decode. Inputs/weights are pretrained; only backend order is randomized. These are narrow probe comparisons, not independent timing trials or corpus-level quality evaluation.
+
+Within this mode, grouped/selective ratios span 0.9823–1.0050. Do not mix these numbers with the other timing mode or route-only replay.
+
+| Probe | T | Grouped ms | Selective ms | Uniform fused ms |
+| --- | --- | --- | --- | --- |
+| wikitext-line-4 | 1 | 12.5716 | 12.7980 | 12.7498 |
+| wikitext-line-4 | 8 | 45.8491 | 45.9423 | 46.5347 |
+| wikitext-line-4 | 128 | 86.2423 | 87.1112 | 121.7019 |
+| wikitext-line-2184 | 1 | 11.7786 | 11.9117 | 12.3433 |
+| wikitext-line-2184 | 8 | 45.1901 | 45.2741 | 48.0430 |
+| wikitext-line-2184 | 128 | 92.0801 | 92.2552 | 125.2214 |
+| wikitext-line-4357 | 1 | 12.1615 | 12.1836 | 12.4841 |
+| wikitext-line-4357 | 8 | 51.2169 | 50.9629 | 53.3386 |
+| wikitext-line-4357 | 128 | 88.9411 | 89.7961 | 123.4104 |
+
+[Raw supplemental evidence](results/pretrained-wikitext-eager.json)
+
+## Matched router-inclusive upstream comparison
+
+All 27 cases passed both numerical checks. These eager measurements include router projection, FP32 softmax, top-k selection, route-weight casting, dispatch and expert computation for every backend, with 20 warmups and 100 samples. Attention and normalization are excluded. The same pretrained authored probes and T=1/8/full prefill-state selections are used.
+
+The HF row executes the actual Transformers OLMoE module. Its Python expert loop is a model reference, not a fast production grouped kernel. Compare selective against Triton grouped to isolate fusion. Comparing against HF also includes the shared grouped projection, activation and dispatch implementation changes. These rows cannot be combined with expert-only timings.
+
+| Probe | T | HF module ms | Triton grouped ms | Selective ms |
+| --- | --- | --- | --- | --- |
+| technical | 1 | 25.1622 | 12.8307 | 12.9126 |
+| technical | 8 | 74.1627 | 48.3523 | 48.9882 |
+| technical | 88 | 121.2216 | 86.5270 | 86.4620 |
+| narrative | 1 | 32.1203 | 12.3894 | 12.3341 |
+| narrative | 8 | 75.4586 | 50.9455 | 50.5252 |
+| narrative | 87 | 122.7423 | 91.9552 | 91.8344 |
+| structured | 1 | 25.1935 | 12.4780 | 12.7012 |
+| structured | 8 | 74.3496 | 49.2042 | 48.9861 |
+| structured | 93 | 124.6044 | 89.4551 | 89.5718 |
+
+[Router-inclusive raw evidence](results/pretrained-whole-moe.json)
+
 ## Interpretation
 
 The measured fusion hypothesis remains unproven. Keep the grouped baseline and existing defaults, report dispatch separately, and rerun on the proposed cluster GPU with stable power/clocks. Broader real-route sampling, a competitive external grouped kernel, memory counters and full-model quality evaluation remain open work.

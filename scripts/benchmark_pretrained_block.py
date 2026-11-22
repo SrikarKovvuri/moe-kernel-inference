@@ -1,7 +1,7 @@
 """First-layer expert-block validation with pretrained weights and actual prefix states.
 
-No full-model generation or quality claim. Attention/router execution is outside
-timing. Small token subsets are selected from prefill, not called decode workloads.
+No full-model generation or quality claim. Attention is outside timing; router
+execution is optional. Small token subsets come from prefill, not decode workloads.
 """
 
 import argparse
