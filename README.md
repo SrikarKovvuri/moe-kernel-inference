@@ -151,6 +151,26 @@ it does not save prompt text. Replay uses recorded routes with **synthetic weigh
 and inputs**, not a checkpoint's hidden states or end-to-end model execution.
 No pretrained routes are included in the initial results.
 
+For first-layer prefill occupancy on a smaller machine, only the causal prefix
+through its router is needed. An optional script downloads approximately 229 MiB
+of selected checkpoint tensors using exact HTTP byte ranges, with a pinned model
+commit and per-tensor checksums. It does not load any expert MLP or later layer:
+
+```sh
+python scripts/capture_first_layer_routes.py --device cpu --output runs/first-layer-routes
+python -m phasemoe.benchmark --preset olmoe --device cuda --dtype bfloat16 \
+  --backends triton_grouped triton_hybrid --mode cuda_graph \
+  --routing-trace runs/first-layer-routes/probe-00-prefill.json \
+  --output runs/first-layer-replay.json
+```
+
+The prefix matches the full upstream model's first router logits exactly in small
+FP32/BF16 tests. Captured pretrained routes are limited to **layer 0 prefill on three
+authored text probes**, not a representative corpus, generation run, later-layer
+sample, or end-to-end inference benchmark. The original full-model script remains
+the route for actual generation/decode collection on a sufficiently large machine.
+See [Hugging Face's safetensors range-reading documentation](https://huggingface.co/docs/safetensors/en/metadata_parsing).
+
 ## Team
 
 Aedin Pereira, Srikar Kovvuri, David Samtani. UNIs and confirmed role assignments

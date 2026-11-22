@@ -24,7 +24,12 @@ def load_variants(path):
         if set(item) - {"name", "strategy", "threshold", "kernel_config"}:
             raise ValueError("unknown variant field")
         name = item["name"]
-        if not isinstance(name, str) or not name or name in names:
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in names
+            or name in ("control_before", "control_after")
+        ):
             raise ValueError("variant names must be nonempty and unique")
         names.add(name)
         strategy = item.get("strategy", "hybrid")
