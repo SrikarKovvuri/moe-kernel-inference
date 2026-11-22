@@ -16,7 +16,12 @@ from pathlib import Path
 import torch
 
 from phasemoe.benchmark import environment, gpu_telemetry, measure, write_json
-from phasemoe.hf_adapter import config_from_hf, routing_from_hf, weights_from_hf
+from phasemoe.hf_adapter import (
+    config_from_hf,
+    routing_from_hf,
+    routing_from_hf_unchecked,
+    weights_from_hf,
+)
 from phasemoe.pretrained_prefix import FirstLayerRouter, fetch_prefix_weights
 from phasemoe.reference import error_metrics, moe_torch, validate_inputs
 from phasemoe.routing import occupancy
@@ -42,9 +47,14 @@ def main():
     p.add_argument("--device", default="cuda")
     p.add_argument("--max-tokens", type=int, default=512)
     p.add_argument(
+        "--include-router",
+        action="store_true",
+        help="eager full MoE block, including gate/softmax/top-k; required for hf backend",
+    )
+    p.add_argument(
         "--backends",
         nargs="+",
-        choices=["torch", "torch_grouped", "triton_grouped", "triton_hybrid", "triton_fused"],
+        choices=["hf", "torch", "torch_grouped", "triton_grouped", "triton_hybrid", "triton_fused"],
         default=["triton_grouped", "triton_hybrid", "triton_fused"],
     )
     p.add_argument("--warmup", type=int, default=20)
@@ -55,6 +65,10 @@ def main():
         p.error("tokens/warmup must be nonnegative; repetitions positive")
     if args.mode == "cuda_graph" and any(not b.startswith("triton_") for b in args.backends):
         p.error("graph mode requires Triton backends")
+    if "hf" in args.backends and not args.include_router:
+        p.error("hf backend requires --include-router for a matched timing scope")
+    if args.include_router and args.mode != "eager":
+        p.error("router-inclusive comparison currently supports eager mode")
     device = torch.device(args.device)
     if (
         device.type != "cuda"
@@ -106,8 +120,11 @@ def main():
         model_revision=revision,
         layer=0,
         dtype="torch.bfloat16",
-        scope="expert_block_including_dispatch",
-        excluded=["attention", "router_logits_topk", "normalization"],
+        scope="moe_block_including_router_and_dispatch"
+        if args.include_router
+        else "expert_block_including_dispatch",
+        excluded=["attention", "normalization"]
+        + ([] if args.include_router else ["router_logits_topk"]),
         config=asdict(config_from_hf(module)),
         prefix_manifest=prefix_manifest,
         expert_manifest=expert_manifest,
@@ -145,19 +162,27 @@ def main():
                     backends = list(args.backends)
                     rng.shuffle(backends)
                     for backend in backends:
-                        if backend == "torch":
-                            fn = partial(moe_torch, x, weights, routing)
+                        if backend == "hf":
+
+                            def fn():
+                                return module(x.unsqueeze(0))[0].squeeze(0)
+                        elif backend == "torch":
+                            kernel = moe_torch
                         elif backend == "torch_grouped":
-                            fn = partial(moe_torch_grouped, x, weights, routing)
+                            kernel = moe_torch_grouped
                         else:
-                            fn = partial(
+                            kernel = partial(
                                 moe_triton,
-                                x,
-                                weights,
-                                routing,
                                 strategy=backend.removeprefix("triton_"),
                                 threshold=1,
                             )
+                        if backend != "hf":
+                            if args.include_router:
+
+                                def fn():
+                                    return kernel(x, weights, routing_from_hf_unchecked(module, x))
+                            else:
+                                fn = partial(kernel, x, weights, routing)
                         actual = fn()
                         check = error_metrics(actual, reference, atol=0.02, rtol=0.03)
                         hf_check = error_metrics(actual, hf_output, atol=0.02, rtol=0.03)

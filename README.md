@@ -193,6 +193,20 @@ weights remain in a local safetensors cache and are not committed. The optional
 model integration is pinned to Transformers 4.46.3, whose numerical behavior is
 covered by the tests.
 
+To compare the actual upstream OLMoE module at a matched, router-inclusive scope:
+
+```sh
+python scripts/benchmark_pretrained_block.py --include-router --mode eager \
+  --backends hf triton_grouped triton_hybrid --tokens 1 8 0 \
+  --output runs/pretrained-whole-moe.json
+```
+
+This includes gate projection, FP32 softmax, top-k selection and route-weight
+casting for every backend. It still excludes attention and normalization. The
+upstream expert loop is a useful model baseline, not a production grouped kernel;
+compare selective fusion with the matching Triton grouped row to isolate fusion.
+Do not combine these timings with the expert-only scope.
+
 For a small public-text diagnostic sample, the optional preparation script selects
 three long paragraphs from a pinned WikiText-2 test file. It records source URL,
 revision, line numbers, license attribution and checksum; raw text stays in `runs/`.

@@ -4,6 +4,7 @@ import torch
 
 from .config import MoEConfig
 from .reference import ExpertWeights
+from .routing import Routing
 from .traces import routing_from_logits
 
 
@@ -41,3 +42,17 @@ def routing_from_hf(module, x):
     # Match the upstream module's cast after FP32 softmax/top-k.
     routing.weights = routing.weights.to(x.dtype)
     return routing
+
+
+@torch.inference_mode()
+def routing_from_hf_unchecked(module, x):
+    """Timed router path for already-validated finite inputs; no host value reads.
+
+    Call routing_from_hf/validate_inputs outside timing first. This performs the
+    same FP32 softmax, top-k, optional normalization and model-dtype cast.
+    """
+    probabilities = module.gate(x).float().softmax(-1)
+    weights, ids = probabilities.topk(module.top_k, dim=-1)
+    if module.norm_topk_prob:
+        weights = weights / weights.sum(-1, keepdim=True)
+    return Routing(ids.contiguous(), weights.to(x.dtype).contiguous(), module.num_experts)

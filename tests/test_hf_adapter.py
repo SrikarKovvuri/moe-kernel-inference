@@ -5,7 +5,12 @@ pytest.importorskip("transformers", reason="optional model integration dependenc
 from transformers import OlmoeConfig  # noqa: E402
 from transformers.models.olmoe.modeling_olmoe import OlmoeSparseMoeBlock  # noqa: E402
 
-from phasemoe.hf_adapter import config_from_hf, routing_from_hf, weights_from_hf  # noqa: E402
+from phasemoe.hf_adapter import (  # noqa: E402
+    config_from_hf,
+    routing_from_hf,
+    routing_from_hf_unchecked,
+    weights_from_hf,
+)
 from phasemoe.reference import error_metrics, moe_torch  # noqa: E402
 
 
@@ -29,6 +34,9 @@ def test_against_upstream_olmoe_module_without_checkpoint(normalized, dtype):
         expected, _ = module(x)
         flattened = x.reshape(-1, config.hidden_size)
         routing = routing_from_hf(module, flattened)
+        timed_routing = routing_from_hf_unchecked(module, flattened)
+        torch.testing.assert_close(timed_routing.expert_ids, routing.expert_ids, atol=0, rtol=0)
+        torch.testing.assert_close(timed_routing.weights, routing.weights, atol=0, rtol=0)
         actual = moe_torch(flattened, weights_from_hf(module), routing).reshape_as(expected)
     if dtype == torch.float32:
         torch.testing.assert_close(actual, expected, atol=1e-7, rtol=1e-5)
