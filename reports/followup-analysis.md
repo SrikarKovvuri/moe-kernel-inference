@@ -43,6 +43,18 @@ The three authored repository probes are a narrow diagnostic sample, not a publi
 
 [Capture manifest and routes](first-layer-routes) · [Authored probes](../experiments/text-probes.json)
 
+## Public-text routing probes
+
+Three deterministic long paragraphs from a pinned, tokenized WikiText-2 test split were truncated to 128 tokens. Capture uses the same pretrained layer-0 prefix and CPU BF16 policy. This is a narrow diagnostic sample, not corpus-wide performance or generation evaluation. Source URL, commit, original line, file hash, prompt hash and token hash are retained without redistributing the text.
+
+| Source line | Tokens | Active experts | Singletons | Maximum occupancy |
+| --- | --- | --- | --- | --- |
+| 4 | 128 | 60 | 2 | 90 |
+| 2184 | 128 | 64 | 3 | 94 |
+| 4357 | 128 | 62 | 2 | 104 |
+
+[Public-text capture evidence](wikitext-routes) · [WikiText attribution and license](https://huggingface.co/datasets/Salesforce/wikitext)
+
 ## Interpretation
 
 The measured fusion hypothesis remains unproven. Keep the grouped baseline and existing defaults, report dispatch separately, and rerun on the proposed cluster GPU with stable power/clocks. Broader real-route sampling, a competitive external grouped kernel, memory counters and full-model quality evaluation remain open work.

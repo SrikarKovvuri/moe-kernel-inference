@@ -248,6 +248,61 @@ def main():
         ),
         "[Capture manifest and routes](first-layer-routes) · "
         "[Authored probes](../experiments/text-probes.json)",
+    ]
+    public_path = root / "wikitext-routes/capture-manifest.json"
+    if public_path.exists():
+        public = read(public_path)
+        text += [
+            "## Public-text routing probes",
+            "Three deterministic long paragraphs from a pinned, tokenized WikiText-2 test "
+            "split were truncated to 128 tokens. Capture uses the same pretrained layer-0 "
+            "prefix and CPU BF16 policy. This is a narrow diagnostic sample, not corpus-wide "
+            "performance or generation evaluation. Source URL, commit, original line, file "
+            "hash, prompt hash and token hash are retained without redistributing the text.",
+            table(
+                ["Source line", "Tokens", "Active experts", "Singletons", "Maximum occupancy"],
+                [
+                    [
+                        t["provenance"]["source_metadata"]["source_line"],
+                        t["provenance"]["context_tokens"],
+                        t["occupancy"]["active_experts"],
+                        t["occupancy"]["singleton_experts"],
+                        t["occupancy"]["max_occupancy"],
+                    ]
+                    for t in public["traces"]
+                ],
+            ),
+            "[Public-text capture evidence](wikitext-routes) · "
+            "[WikiText attribution and license](https://huggingface.co/datasets/Salesforce/wikitext)",
+        ]
+    pretrained_path = root / "results/pretrained-block.json"
+    if pretrained_path.exists():
+        pretrained = read(pretrained_path)
+        rows = pretrained["results"]
+        maximum = max(r["correctness"]["relative_l2_error"] for r in rows)
+        hf_maximum = max(r["upstream_bf16_comparison"]["relative_l2_error"] for r in rows)
+        text += [
+            "## Pretrained expert-block validation",
+            f"All {len(rows)} BF16 cases passed both the FP32 reference and upstream BF16 "
+            "module comparison at atol 0.02 / rtol 0.03. Unlike route replay, these cases "
+            "use actual checkpoint expert weights and actual hidden states from the first "
+            "attention/norm prefix. The maximum relative L2 errors were "
+            f"{maximum:.5f} versus FP32 and {hf_maximum:.5f} versus upstream BF16.",
+            "Graph timings use 20 warmups per phase and 100 samples, default sort dispatch, "
+            "threshold 1 and a 32 × 128 combine tile. They include expert dispatch but exclude "
+            "attention, normalization and router computation. T=1/8 rows are suffix subsets "
+            "of prefill hidden states, not decode. Full-prompt cases contain 87–93 tokens. "
+            "The three authored prompts do not establish model quality or later-layer behavior.",
+            table(
+                ["Prompt", "T", "Phase", "Backend", "CUDA-event median ms"],
+                [
+                    [r["prompt"], r["tokens"], r["phase"], r["backend"], f"{ms(r):.4f}"]
+                    for r in rows
+                ],
+            ),
+            "[Pretrained block evidence and tensor checksums](results/pretrained-block.json)",
+        ]
+    text += [
         "## Interpretation",
         "The measured fusion hypothesis remains unproven. Keep the grouped baseline and existing "
         "defaults, report dispatch separately, and rerun on the proposed cluster GPU with stable "
