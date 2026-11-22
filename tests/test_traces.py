@@ -59,3 +59,43 @@ def test_trace_refuses_missing_provenance_and_fractional_ids(tmp_path):
     path.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="integers"):
         load_trace(path)
+
+
+def test_trace_replay_preserves_source_and_rejects_wrong_preset(tmp_path):
+    from phasemoe.benchmark import main
+
+    path = tmp_path / "trace.json"
+    r = synthetic_routing(MoEConfig.tiny(), 3)
+    save_trace(
+        path,
+        r,
+        provenance=dict(
+            source="external",
+            model="unit-test",
+            model_revision="test",
+            layer=0,
+            phase="decode",
+            norm_topk_prob=False,
+        ),
+    )
+    output = tmp_path / "benchmark.json"
+    report = main(
+        [
+            "--routing-trace",
+            str(path),
+            "--warmup",
+            "0",
+            "--repetitions",
+            "1",
+            "--output",
+            str(output),
+        ]
+    )
+    row = report["results"][0]
+    assert row["tokens"] == 3
+    assert row["distribution"] == "trace"
+    assert row["routing_source"] == "external"
+    assert row["weight_source"] == "synthetic random"
+    assert row["routing_provenance"]["model"] == "unit-test"
+    with pytest.raises(SystemExit):
+        main(["--preset", "olmoe", "--routing-trace", str(path)])

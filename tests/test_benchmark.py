@@ -36,3 +36,10 @@ def test_summary_quantiles_and_invalid_samples():
     for invalid in ([], [-1], [float("nan")], [float("inf")]):
         with pytest.raises(ValueError):
             summarize(invalid)
+
+
+def test_graph_timing_requires_cuda():
+    with pytest.raises(ValueError, match="CUDA"):
+        measure(lambda: None, device="cpu", mode="cuda_graph")
+    with pytest.raises(SystemExit):
+        main(["--mode", "cuda_graph"])

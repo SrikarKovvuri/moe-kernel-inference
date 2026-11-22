@@ -55,7 +55,10 @@ def load_trace(path):
     ids = torch.tensor(data["expert_ids"])
     if tokens and ids.dtype not in (torch.int32, torch.int64):
         raise ValueError("trace expert IDs must be integers")
+    weights = torch.tensor(data["weights"], dtype=torch.float32)
+    if tokens and (ids.shape != (tokens, k) or weights.shape != (tokens, k)):
+        raise ValueError("trace tensors must match declared [tokens, top_k] shape")
     ids = ids.to(dtype=torch.int64).reshape(tokens, k)
-    weights = torch.tensor(data["weights"], dtype=torch.float32).reshape(tokens, k)
+    weights = weights.reshape(tokens, k)
     routing = Routing(ids, weights, data["num_experts"]).validate()
     return routing, data["provenance"]

@@ -51,3 +51,31 @@ def test_hybrid_matches_grouped_and_torch(distribution, tokens):
         out = moe_triton(x, w, r, threshold=threshold)
         metrics = error_metrics(out, baseline, atol=0.02, rtol=0.03)
         assert metrics["passed"], metrics
+
+
+def test_graph_replay_recomputes_routing_and_outputs():
+    from phasemoe.triton_backend import moe_triton
+
+    c = MoEConfig.tiny()
+    w = ExpertWeights.random(c, device="cuda", dtype=torch.bfloat16)
+    r = synthetic_routing(c, 8, "balanced").to("cuda")
+    x = torch.randn(8, c.hidden_size, device="cuda", dtype=torch.bfloat16)
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        for _ in range(3):
+            moe_triton(x, w, r)
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph, stream=stream):
+        actual = moe_triton(x, w, r)
+    for distribution in ("uniform", "skewed", "balanced"):
+        fresh = synthetic_routing(c, 8, distribution, seed=42).to("cuda")
+        r.expert_ids.copy_(fresh.expert_ids)
+        r.weights.copy_(fresh.weights)
+        x.mul_(0.7)
+        graph.replay()
+        torch.cuda.synchronize()
+        expected = moe_torch(x, w, r)
+        metrics = error_metrics(actual, expected, atol=0.02, rtol=0.03)
+        assert metrics["passed"], metrics
