@@ -1,38 +1,49 @@
-# Experiment plan
+# Midpoint status and second-half research plan
 
-## Claim under test
+## Established at midpoint
 
-Occupancy-aware fusion of expert down projection and output aggregation may reduce
-single-layer latency at low token counts. A slowdown is a valid result. Compare
-against the same grouped projection implementation with only the down/combine
-strategy changed, and separately report the simple PyTorch baseline.
+- OLMoE dimensions, routing semantics and deterministic synthetic workloads.
+- Independent mathematical reference and a working fixed grouped-GEMM baseline.
+- Baseline correctness checks, eager latency measurements and basic stage profiling.
+- Expert-occupancy counts, histograms and baseline visualizations.
 
-## Milestones
+The current research question is how uneven expert workloads affect GPU execution,
+and whether a different execution design can reduce complete MoE block latency.
+No optimization implementation or positive/negative optimization conclusion is included.
 
-1. Tested routing semantics, independent reference, and PyTorch expert baseline.
-2. Reproducible CPU/GPU benchmark output with device, dtype, software, dimensions,
-   routing distribution/seed, warmup, repetitions, raw samples, and source revision.
-3. Grouped Triton projection baseline and BF16 correctness tests.
-4. Singleton fused down/combine kernel, then hybrid integration and threshold sweep.
-5. Actual development measurements, figures, profiling, and a conservative midpoint draft.
-6. L40S/A6000 rerun and real model routing traces when those resources are available.
+## Team-owned research after midpoint
 
-## Measurement protocol
+1. Reproduce the baseline on the intended L40S/A6000 under stable power/clocks.
+   Check wall/event agreement and inspect actual kernels before interpreting timings.
+2. Establish at least one optimized external grouped-GEMM comparison with matched
+   dtype, input/routes, numerical tolerance and timing boundaries.
+3. Collect real model routes across layers, prompt lengths and concurrent decode
+   sequences; distinguish actual generation from synthetic token-count tests.
+4. Independently design candidates. Explore alternative layouts and execution
+   strategies, fusion over different or more extensive stages, occupancy-aware
+   scheduling, weight reuse, and resource tradeoffs. Select designs from evidence;
+   do not assume any previous strategy was optimal or make a singleton policy mandatory.
+5. Implement selected candidates, add their correctness checks, and evaluate total
+   block latency including dispatch/scheduling. Add ablations only when needed to
+   distinguish mechanisms. Measure memory traffic and GPU utilization with appropriate tools.
+6. Validate model integration/quality where numerical or execution changes require it.
+   Report limitations and negative findings as carefully as improvements.
 
-- Synthetic token counts: 1, 8, 32, 128, 512; distributions: uniform, balanced, skewed.
-- Default target configuration: OLMoE dimensions, BF16, thresholds 0, 1, 2, 4.
-- Use identical inputs, routes, and weights for all backends in a case.
-- Validate outside the timed region, using explicit absolute/relative tolerances.
-- Compile and warm up before measurement. Record median, p10/p90, and raw samples.
-- CUDA events measure stream elapsed time; synchronized wall time measures Python
-  launch/dispatch overhead as well. Do not equate isolated kernel sums with full latency.
-- Record whether routing preparation and allocations are included and whether timing
-  uses eager launches or CUDA graphs. Never compare different timing scopes as speedups.
-- Synthetic routes and random weights do not establish model quality or real routing statistics.
-- Keep full-scale GPU validation separate from small-shape CPU logic checks.
+## Baseline protocol
 
-## Midpoint requirements still needing team input
+Use identical seeded inputs/weights/routes for the PyTorch and grouped baselines.
+At full OLMoE shape, check BF16 against FP32 at atol=0.02, rtol=0.03; small-shape
+FP32 tests also use the independent oracle. Report numerical errors, not just pass/fail.
+Compile/check first, then 20 warmups and 100 eager samples. Keep raw wall and
+CUDA-event measurements and source hashes. Record every shape, dtype, device,
+routing distribution, seed and scope. Repeat independent runs before interpreting
+small differences; the current fixed-order synthetic sweep is preliminary.
 
-UNIs, confirmed roles, experiment-dashboard URL, and confirmation that the approved
-three-person team satisfies the course's stated four-to-five-person template.
-Do not invent these fields or claim cluster access that has not been exercised.
+Synthetic balanced routing is an even-load control, not a learned router.
+Uniform and skewed routes are controlled synthetic distributions, not corpus statistics.
+
+## Administrative fields
+
+Team UNIs, confirmed roles, an accessible dashboard URL and approval of the listed
+three-person team against the four-to-five-person template remain unresolved.
+The GitHub evidence directory is not a claim that an external dashboard exists.

@@ -22,7 +22,6 @@ def load_report(path):
             r["scope"],
             r["timing"]["mode"],
             r["seed"],
-            r["threshold"],
             r["timing"]["warmup"],
             r["timing"]["repetitions"],
             json.dumps(r.get("kernel_config"), sort_keys=True)
@@ -61,6 +60,8 @@ def make_plots(report, output, note=None):
         f"Synthetic weights, {route_source} routes; expert block incl. dispatch; source {date}, "
         f"commit {str(report['environment']['git_commit'])[:7]}"
     )
+    if report["environment"].get("git_dirty"):
+        caption += " (uncommitted working tree; source hashes in JSON)"
     if note:
         caption += "\n" + note
     distributions = list(dict.fromkeys(r["distribution"] for r in rows))
@@ -69,17 +70,11 @@ def make_plots(report, output, note=None):
     bottom = 0.22 if len(distributions) == 1 else 0.15
     colors = {
         "torch": "#777777",
-        "torch_grouped": "#8B5998",
         "triton_grouped": "#304E78",
-        "triton_hybrid": "#B15B35",
-        "triton_fused": "#567D64",
     }
     labels = {
         "torch": "PyTorch expert loop",
-        "torch_grouped": "PyTorch native grouped API",
         "triton_grouped": "Triton grouped",
-        "triton_hybrid": f"Selective (threshold {first['threshold']})",
-        "triton_fused": "Uniformly fused",
     }
     for metric in ("wall", "cuda_event"):
         if metric not in first["timing"]:
@@ -105,11 +100,13 @@ def make_plots(report, output, note=None):
             ax.grid(alpha=0.2)
         axes[0, 0].legend(fontsize=8)
         title = "Synchronized wall latency" if metric == "wall" else "CUDA-event stream latency"
-        fig.suptitle(f"{title} by token count (bands: p10–p90)", fontsize=13)
+        fig.suptitle(f"{title} by token count (bands: p10-p90)", fontsize=13)
         fig.text(0.5, 0.02, caption, ha="center", fontsize=8)
         fig.tight_layout(rect=(0, bottom, 1, 0.94))
         fig.savefig(output / f"latency-{metric}.png", dpi=180)
-        fig.savefig(output / f"latency-{metric}.pdf")
+        fig.savefig(
+            output / f"latency-{metric}.pdf", metadata={"CreationDate": None, "ModDate": None}
+        )
         plt.close(fig)
 
     # Occupancy is a property of routes, independent of backend. Select one row per case.
@@ -148,7 +145,7 @@ def make_plots(report, output, note=None):
     )
     fig.tight_layout(rect=(0, 0.13, 1, 0.94))
     fig.savefig(output / "occupancy.png", dpi=180)
-    fig.savefig(output / "occupancy.pdf")
+    fig.savefig(output / "occupancy.pdf", metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
 
 

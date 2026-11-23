@@ -12,7 +12,7 @@ def test_plot_loader_refuses_incomplete_or_mixed_experiments(tmp_path):
         ["--tokens", "1", "2", "--warmup", "0", "--repetitions", "1", "--output", str(path)]
     )
     assert len(load_report(path)["results"]) == 2
-    report["results"][1]["timing"]["mode"] = "cuda_graph"
+    report["results"][1]["dtype"] = "torch.float16"
     path.write_text(json.dumps(report))
     with pytest.raises(ValueError, match="mixed"):
         load_report(path)

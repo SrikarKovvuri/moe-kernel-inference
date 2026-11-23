@@ -1,0 +1,47 @@
+{
+  "kind": "baseline_source_audit",
+  "measurement_artifacts": [
+    "baseline-current.json",
+    "baseline-profile.json"
+  ],
+  "normalization": "Git stores text with LF under .gitattributes. Normalize CRLF to LF before comparing the published source with lf_normalized_sha256. Raw measurement hashes are preserved.",
+  "verification": "Each measured benchmark/kernel module matched both artifacts byte-for-byte before commit normalization.",
+  "files": [
+    {
+      "path": "src/phasemoe/__init__.py",
+      "measured_bytes_sha256": "304a62df8a158c4c90157804982b5335942a256226c3da0d299bb3cf8fbb826d",
+      "lf_normalized_sha256": "304a62df8a158c4c90157804982b5335942a256226c3da0d299bb3cf8fbb826d"
+    },
+    {
+      "path": "src/phasemoe/benchmark.py",
+      "measured_bytes_sha256": "8f8ca5fd200ffd6d83c528440e2b70149088a36ff6347694c0d3069a7bf35fd1",
+      "lf_normalized_sha256": "f84ef99b07e7c56f8f466cdee122fcf75ad38a78cf9d8639a46ca36650e7ee1a"
+    },
+    {
+      "path": "src/phasemoe/config.py",
+      "measured_bytes_sha256": "106fc75218c9f5098582ef6230e30892053d4e85ff01a70166c80fbc76dfdb45",
+      "lf_normalized_sha256": "106fc75218c9f5098582ef6230e30892053d4e85ff01a70166c80fbc76dfdb45"
+    },
+    {
+      "path": "src/phasemoe/grouped.py",
+      "measured_bytes_sha256": "9e69f4955fa762e8c353d1f3c4a4c45d36c772656a97aa7530ef6dfd3288bc4b",
+      "lf_normalized_sha256": "9e69f4955fa762e8c353d1f3c4a4c45d36c772656a97aa7530ef6dfd3288bc4b"
+    },
+    {
+      "path": "src/phasemoe/profiling.py",
+      "measured_bytes_sha256": "e654fd3af81c103c363054f7049359f577d793e06bb926e4818d14506458fe5e",
+      "lf_normalized_sha256": "2bc4926652d610746dd811f569f0a5b0f98b0085b3cd26edcce319bfa087f5e8"
+    },
+    {
+      "path": "src/phasemoe/reference.py",
+      "measured_bytes_sha256": "c9c046404b521619692f645a705afa21d64ec00a5f2603b1eddf38aa1e5cc651",
+      "lf_normalized_sha256": "c9c046404b521619692f645a705afa21d64ec00a5f2603b1eddf38aa1e5cc651"
+    },
+    {
+      "path": "src/phasemoe/routing.py",
+      "measured_bytes_sha256": "767f98e500e63b1d5d42abaf132cdce1691b4e1e1b136a6deb0c44794bb601f6",
+      "lf_normalized_sha256": "767f98e500e63b1d5d42abaf132cdce1691b4e1e1b136a6deb0c44794bb601f6"
+    }
+  ],
+  "plotting_note": "Only plotting labels/captions and report formatting changed after measurement; these do not participate in GPU timing."
+}

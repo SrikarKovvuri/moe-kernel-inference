@@ -1,82 +1,43 @@
-# Midpoint evidence
+# Baseline midpoint evidence
 
-Read the [PDF](midpoint-report.pdf), [Markdown](midpoint-report.md), or editable
-[Word report](midpoint-report.docx). These are drafts for team review:
-UNIs, confirmed roles, the dashboard URL, and team-size approval still need team input.
+This directory contains baseline measurements and a conservative midpoint report.
+It does not contain an implemented research optimization or a performance verdict on one.
 
-The initial result is **no consistent singleton-fusion speedup** against this
-repository's grouped Triton baseline. It is not a comparison with the strongest
-production backend. All 60 full-shape BF16 cases passed the recorded correctness
-tolerance, but the laptop GPU was heavily power/clock constrained.
+- `midpoint-report.md`, `.docx`, `.pdf`: concise report for team review.
+- `results/baseline-initial.json`: 30 retained historical PyTorch/grouped-baseline
+  cases, with unchanged raw timing samples and correctness metrics. The derivation
+  records the original artifact hash, Git commit and removed unused metadata.
+  These measurements describe the historical grouped path, not a fresh run of the
+  simplified source. The full original artifact remains in Git history.
+- `results/baseline-current.json`: fresh 18-case check of the simplified source,
+  T=1/8/128, uniform/balanced/skewed, PyTorch/grouped, BF16, 20 warmups, 100 samples.
+- `results/baseline-profile.json` and `baseline-trace.json`: fresh grouped-only
+  stage measurements and one warmed diagnostic profiler trace at T=8, uniform.
+- `results/source-audit.json`: verified measured benchmark/kernel hashes plus
+  LF-normalized hashes for Git checkouts; raw measurement metadata is unchanged.
+- `results/gpu-power-state.txt`, `cpu-hardware.txt`: original development hardware
+  diagnostics. Fresh runs include their own per-case telemetry.
+- `figures/`: current baseline latency and synthetic expert occupancy plots.
 
-[Follow-up experiments](followup-analysis.md) add 45 graph cases, a 216-candidate
-threshold/tile sweep, native-backend execution profiling, and genuine pretrained
-first-layer prefill occupancy. These do not replace or silently extend the initial
-eager table. The updated midpoint draft separates its initial table from follow-up
-validation; the extended analysis retains the detailed comparison tables.
+The report uses the fresh run. Both sets are preliminary laptop/WSL measurements,
+not target-cluster, actual decode, pretrained quality or production-performance claims.
+Wall and CUDA-event clocks are retained separately. Bands show p10-p90 timing
+samples, not confidence intervals from independent workload trials.
 
-## Evidence files
+Measurements were collected while the source restructure was uncommitted. Metadata
+preserves `git_dirty=true`, the parent revision and actual source-file SHA256 hashes.
+The source audit verifies the measured benchmark/kernel modules and accounts for
+Git's CRLF-to-LF normalization; plot labels were corrected afterward. Do not cite the parent revision alone as the
+source for these new results or rewrite the original dirty-tree flag.
 
-- `results/olmoe-bf16-initial.json`: 60 cases, 100 measured eager calls and 20 warmups
-  per case; 5 token counts x 3 distributions x 4 backends. Raw wall and CUDA-event
-  samples, shapes, dtype, source revision, correctness and occupancy are retained.
-- `results/profile-eager.json`: isolated stage timings at 8 tokens, uniform routing,
-  BF16, threshold 1; 20 warmups and 100 calls per stage. Precomputed stage inputs
-  mean these medians must not be summed into an end-to-end latency claim.
-- `results/profile-trace.json`: a single warmed PyTorch CPU/CUDA profiler trace.
-  Open in Perfetto or a Chrome trace viewer. It is not a Nsight memory-counter run.
-- `results/gpu-power-state.txt`: diagnostic snapshot during development, reporting
-  P8, 210 MHz SM, 405 MHz memory and software power/thermal caps. It is not a
-  continuous per-sample clock trace. Later benchmark artifacts include before/after
-  `nvidia-smi` snapshots per case.
-- `figures/`: regenerated latency and occupancy plots. Latency bands are p10–p90
-  over repeated timing samples, not confidence intervals across independent runs.
-- `results/olmoe-bf16-graph.json`: 45 graph cases, same full dimensions and 100
-  measured replays; graph warmup/capture counts are explicit in every result.
-- `results/tuning-down-combine.json`: randomized isolated-phase search, 216
-  candidates, 10 warmups and 30 samples, with grouped controls before/after each case.
-- `results/native-profile.json` and `native-trace.json`: evidence that native
-  PyTorch grouped-mm uses its host-loop fallback on this SM89 device/software.
-- `first-layer-routes/`: pretrained layer-0 prefill routes from three authored
-  text probes; pinned checkpoint revision and per-tensor checksums. This small
-  diagnostic sample is not representative of a corpus or later model layers.
-- `wikitext-routes/`: three pinned public WikiText-2 test paragraph captures at
-  context 128, with source attribution and hashes; raw dataset text is not committed.
-- `results/pretrained-block.json`: 27 checkpoint-backed BF16 GPU cases, using
-  actual expert weights and prefix hidden states. Every case passes both FP32 and
-  upstream BF16 comparisons. See its [source audit](results/pretrained-block-provenance.md)
-  for the preserved dirty-tree flag; these remain single-block graph measurements.
-- `results/ablation-graph.json`: 126 full-block measurements across 18 independent
-  seed/shape/routing cases, separating dispatch improvements from fusion.
-- `results/ablation-eager.json`: the same 126 randomized measurements in eager
-  execution, with before/after grouped controls and three independent route seeds.
-- `results/pretrained-whole-moe.json`: 27 router-inclusive eager cases comparing
-  the actual upstream module, Triton grouped, and selective execution at matched scope.
-- `results/pretrained-eager.json`, `pretrained-wikitext-eager.json`, and
-  `pretrained-wikitext-graph.json`: 27 cases each, separating authored/public inputs
-  and eager/graph execution. These extend the detailed follow-up analysis; the
-  midpoint report retains its original tables and explicitly identified follow-ups.
-- `results/pretrained-wikitext-long-graph.json`: nine graph cases on three contiguous
-  public-text passages, each truncated to 512 tokens. They have 0–1 singleton
-  experts; actual pretrained weights and hidden states are used.
-
-All initial measurements use synthetic random expert weights and routes at OLMoE
-dimensions. No checkpoint weights, real prompts, or model quality results are
-included. Large token counts are shape analogues of prefill, not complete model
-prefill timing. Initial backends ran in a fixed order; repeated/randomized controls
-are needed before interpreting small differences.
-
-## Regeneration
+## Regenerate
 
 ```sh
-python -m phasemoe.plots reports/results/olmoe-bf16-initial.json \
-  --output reports/figures \
-  --note "Constrained development run: P8, 210 MHz SM / 405 MHz memory observed"
-python scripts/build_midpoint_report.py \
-  --benchmark reports/results/olmoe-bf16-initial.json \
-  --profile reports/results/profile-eager.json --output reports
-python scripts/analyze_followup.py --reports reports
+python -m phasemoe.plots reports/results/baseline-current.json --output reports/figures
+python scripts/build_midpoint_report.py --benchmark reports/results/baseline-current.json \
+  --profile reports/results/baseline-profile.json --output reports
 ```
 
-The report builder requires `python-docx`; render the DOCX and inspect every page
-after changing it. The benchmark dependencies do not require a document renderer.
+The report builder needs the `report` extra. Render and visually inspect the Word
+report before exporting its PDF. Team UNIs, roles, dashboard-link acceptance and
+team-size approval remain required before submission.

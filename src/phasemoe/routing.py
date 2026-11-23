@@ -98,11 +98,8 @@ def synthetic_routing(config: MoEConfig, num_tokens: int, distribution="uniform"
     return Routing(ids.contiguous(), weights.contiguous(), config.num_experts).validate()
 
 
-def occupancy(routing: Routing, threshold=1):
-    if threshold < 0:
-        raise ValueError("threshold must be nonnegative")
+def occupancy(routing: Routing):
     counts = torch.bincount(routing.expert_ids.flatten().cpu(), minlength=routing.num_experts)
-    light = (counts > 0) & (counts <= threshold)
     assignments = int(counts.sum())
     return {
         "counts": counts.tolist(),
@@ -112,7 +109,4 @@ def occupancy(routing: Routing, threshold=1):
         "singleton_experts": int((counts == 1).sum()),
         "active_experts": int((counts > 0).sum()),
         "max_occupancy": int(counts.max()),
-        "light_experts": int(light.sum()),
-        "light_assignment_fraction": int(counts[light].sum()) / assignments if assignments else 0.0,
-        "threshold": threshold,
     }

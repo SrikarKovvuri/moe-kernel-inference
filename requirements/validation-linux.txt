@@ -7,5 +7,3 @@ numpy==2.5.5
 pytest==9.2.0
 matplotlib==3.11.2
 ruff==0.17.6
-transformers==4.46.3
-accelerate==1.1.1

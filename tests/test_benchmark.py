@@ -38,8 +38,15 @@ def test_summary_quantiles_and_invalid_samples():
             summarize(invalid)
 
 
-def test_graph_timing_requires_cuda():
-    with pytest.raises(ValueError, match="CUDA"):
-        measure(lambda: None, device="cpu", mode="cuda_graph")
+def test_grouped_baseline_rejects_cpu_execution(tmp_path):
     with pytest.raises(SystemExit):
-        main(["--mode", "cuda_graph"])
+        main(
+            [
+                "--device",
+                "cpu",
+                "--backends",
+                "triton_grouped",
+                "--output",
+                str(tmp_path / "run.json"),
+            ]
+        )
