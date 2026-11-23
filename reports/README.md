@@ -29,6 +29,8 @@ preserves `git_dirty=true`, the parent revision and actual source-file SHA256 ha
 The source audit verifies the measured benchmark/kernel modules and accounts for
 Git's CRLF-to-LF normalization; plot labels were corrected afterward. Do not cite the parent revision alone as the
 source for these new results or rewrite the original dirty-tree flag.
+The matching measured source is in [checkpoint 5636091](https://github.com/SrikarKovvuri/moe-kernel-inference/tree/5636091e76d034196af7bd43fa8320638cf5d85a).
+Later baseline fixes do not retroactively rerun or replace these measurements.
 
 ## Regenerate
 

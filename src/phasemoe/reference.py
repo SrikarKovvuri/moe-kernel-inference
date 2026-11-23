@@ -59,15 +59,17 @@ def validate_inputs(x, weights: ExpertWeights, routing: Routing):
 def moe_oracle(x, weights: ExpertWeights, routing: Routing):
     """Independent token/slot loop in FP32; for correctness, never timing."""
     validate_inputs(x, weights, routing)
-    out = torch.zeros(x.shape, dtype=torch.float32, device=x.device)
-    for token in range(routing.num_tokens):
-        for slot in range(routing.top_k):
-            expert = int(routing.expert_ids[token, slot])
-            xi = x[token].float()
-            gate = xi @ weights.gate[expert].float()
-            up = xi @ weights.up[expert].float()
-            value = (F.silu(gate) * up) @ weights.down[expert].float()
-            out[token] += routing.weights[token, slot].float() * value
+    # Explicit .float() inputs alone do not prevent autocast from lowering GEMMs.
+    with torch.autocast(device_type=x.device.type, enabled=False):
+        out = torch.zeros(x.shape, dtype=torch.float32, device=x.device)
+        for token in range(routing.num_tokens):
+            for slot in range(routing.top_k):
+                expert = int(routing.expert_ids[token, slot])
+                xi = x[token].float()
+                gate = xi @ weights.gate[expert].float()
+                up = xi @ weights.up[expert].float()
+                value = (F.silu(gate) * up) @ weights.down[expert].float()
+                out[token] += routing.weights[token, slot].float() * value
     return out
 
 
@@ -78,19 +80,21 @@ def moe_torch(x, weights: ExpertWeights, routing: Routing):
     BF16 projections are rounded to BF16 at each projection boundary. Activation
     multiplication and accumulation use FP32; activated values are stored in x.dtype.
     Data-dependent nonzero and Python expert loops are part of this simple baseline.
+    Ambient autocast must not override this explicit dtype policy.
     """
-    out = torch.zeros(x.shape, dtype=torch.float32, device=x.device)
-    for expert in range(routing.num_experts):
-        tokens, slots = torch.where(routing.expert_ids == expert)
-        if tokens.numel() == 0:
-            continue
-        xi = x[tokens]
-        gate = (xi @ weights.gate[expert]).float()
-        up = (xi @ weights.up[expert]).float()
-        hidden = (F.silu(gate) * up).to(x.dtype)
-        values = (hidden @ weights.down[expert]).float()
-        values *= routing.weights[tokens, slots, None].float()
-        out.index_add_(0, tokens, values)
+    with torch.autocast(device_type=x.device.type, enabled=False):
+        out = torch.zeros(x.shape, dtype=torch.float32, device=x.device)
+        for expert in range(routing.num_experts):
+            tokens, slots = torch.where(routing.expert_ids == expert)
+            if tokens.numel() == 0:
+                continue
+            xi = x[tokens]
+            gate = (xi @ weights.gate[expert]).float()
+            up = (xi @ weights.up[expert]).float()
+            hidden = (F.silu(gate) * up).to(x.dtype)
+            values = (hidden @ weights.down[expert]).float()
+            values *= routing.weights[tokens, slots, None].float()
+            out.index_add_(0, tokens, values)
     return out.to(x.dtype)
 
 

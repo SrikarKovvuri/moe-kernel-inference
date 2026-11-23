@@ -89,3 +89,18 @@ def test_bfloat16_baseline_is_numerically_close():
     r = synthetic_routing(c, 7)
     metrics = error_metrics(moe_torch(x, w, r), moe_oracle(x, w, r), atol=0.02, rtol=0.03)
     assert metrics["passed"], metrics
+
+
+@pytest.mark.parametrize("implementation", [moe_torch, moe_oracle])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_reference_precision_is_independent_of_ambient_autocast(implementation, dtype):
+    c = MoEConfig.tiny()
+    x = torch.randn(7, c.hidden_size, generator=torch.Generator().manual_seed(3)).to(dtype)
+    w = ExpertWeights.random(c, seed=7, dtype=dtype)
+    r = synthetic_routing(c, 7, seed=11)
+    expected = implementation(x, w, r)
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        actual = implementation(x, w, r)
+        assert torch.is_autocast_enabled("cpu")
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+    assert actual.dtype == (torch.float32 if implementation is moe_oracle else dtype)
