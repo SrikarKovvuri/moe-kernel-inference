@@ -89,11 +89,7 @@ The [research plan](docs/experiment-plan.md) covers target-GPU replication,
 stronger external baselines, real routing data, and independent kernel exploration.
 Fusion scope, execution strategies and scheduling policy remain open decisions.
 
-## Team and links
-
-Aedin Pereira, Srikar Kovvuri, David Samtani. UNIs, confirmed roles, an accessible
-experiment-dashboard URL, and approval of the three-person team remain pending.
-
+## Important Links
 - [Repository](https://github.com/SrikarKovvuri/moe-kernel-inference)
 - [OLMoE paper](https://arxiv.org/abs/2409.02060)
 - [OLMoE configuration](https://huggingface.co/allenai/OLMoE-1B-7B-0924/blob/6d84c48581ece794365f2b8e9cfb043c68ade9c5/config.json)
